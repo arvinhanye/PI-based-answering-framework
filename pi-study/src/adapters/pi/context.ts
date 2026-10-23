@@ -1,3 +1,4 @@
+import { describeIssues } from '../../presentation/issues.js';
 import { readFileSync, statSync } from 'node:fs';
 import type { ImageContent, TextContent } from '@earendil-works/pi-ai';
 import { safeQuestionImages } from './images.js';
@@ -23,7 +24,7 @@ export async function questionContext(app: StudyApp, snapshot: SessionSnapshot):
     const content: Record<string, unknown> = { stem: q.stem, options: q.options, kind: q.kind, topics: q.topics, imageNotice: `已发送 ${images.length} 张题图；有 ${q.assets.filter(a => a.role === 'question').length - images.length} 张题图未发送`, answered: snapshot.status === 'submitted' };
     if (snapshot.status === 'submitted' || snapshot.status === 'revealed') {
         const f = await app.study.feedback(q.presentationId);
-        Object.assign(content, { yourAnswer: snapshot.answer, correct: f.grade?.correct, sourceAnswer: f.answer, sourceExplanation: f.explanation, issues: f.issues });
+        Object.assign(content, { yourAnswer: snapshot.answer, correct: f.grade?.correct, sourceAnswer: f.answer, sourceExplanation: f.explanation, issues: describeIssues(f.issues).descriptions });
     }
     return [{ type: 'text', text: '当前题（教材数据）：\n' + JSON.stringify(content) }, ...images];
 }

@@ -21,7 +21,7 @@ export interface ConversionResult { bank:QuestionBankInput; outputPath:string; }
 export interface SourceInput { path:string; outputDir:string; }
 export interface UserActionContext { origin:'cli'|'pi-interactive'|'pi-menu';eventId:string; }
 export interface Bank {id:string;name:string;createdAt:string;}
-export interface QuestionView {questionRevisionId:string;questionId:string;sourceId:string;sourceKey:string;kind:QuestionKind;stem:string;options:Array<{id:string;text:string}>;topics:string[];status:StructureStatus;issueCount:number;locations:SourceLocation[];assets:AssetInput[];presentationId:string;sessionId:string;}
+export interface QuestionView {questionRevisionId:string;questionId:string;sourceId:string;sourceKey:string;kind:QuestionKind;stem:string;options:Array<{id:string;text:string}>;topics:string[];status:StructureStatus;issueCount:number;warnings:string[];locations:SourceLocation[];assets:AssetInput[];presentationId:string;sessionId:string;}
 export interface SubmissionInput {sessionId:string;presentationId:string;questionRevisionId:string;answer:string[];confidence:'sure'|'unsure';idempotencyKey:string;}
 export interface GradeResult {status:'scored'|'unscorable'|'disputed';score:number|null;maxScore:number;correct:boolean|null;basisStatus:string;reason:string;}
 export interface SubmissionReceipt {id:string;presentationId:string;grade:GradeResult;assisted:boolean;createdAt:string;}

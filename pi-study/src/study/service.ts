@@ -1,3 +1,4 @@
+import { describeIssues } from '../presentation/issues.js';
 import { randomUUID } from 'node:crypto';
 import type { QuestionInput, QuestionView, SessionView, SessionSnapshot, StartSessionInput, SubmissionInput, SubmissionReceipt, FeedbackView, UserActionContext } from '../contracts.js';
 import { StudyStore, CoreError } from '../storage/business.js';
@@ -41,7 +42,7 @@ export class StudyService {
     const r = this.row('SELECT r.*,q.source_id,q.source_key FROM revisions r JOIN questions q ON q.id=r.question_id WHERE r.id=?', p.revision_id)!;
     const q: QuestionInput = JSON.parse(r.payload);
     return {
-      questionRevisionId: r.id, questionId: r.question_id, sourceId: r.source_id, sourceKey: r.source_key, kind: q.kind, stem: q.stem, options: q.options, topics: q.topics, status: q.status, issueCount: q.issues.length, locations: q.locations, assets: q.assets.filter(a => a.role === 'question'), presentationId: p.id, sessionId: p.session_id
+      questionRevisionId: r.id, questionId: r.question_id, sourceId: r.source_id, sourceKey: r.source_key, kind: q.kind, stem: q.stem, options: q.options, topics: q.topics, status: q.status, issueCount: q.issues.length, warnings: describeIssues(q.issues).before, locations: q.locations, assets: q.assets.filter(a => a.role === 'question'), presentationId: p.id, sessionId: p.session_id
     };
   }
   async start(input: StartSessionInput): Promise<SessionView> {

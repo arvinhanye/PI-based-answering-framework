@@ -1,15 +1,17 @@
+import { describeIssues } from '../presentation/issues.js';
 import type { QuestionInput, GradeResult } from '../contracts.js';
 export function gradeObjective(q: QuestionInput, answer: string[]): GradeResult {
+  const issues = describeIssues(q.issues, q.status);
   const base = {
-    maxScore: 1, basisStatus: q.basisStatus
+    maxScore: 1, basisStatus: q.basisStatus === 'disputed' && issues.explanationOnlyDispute ? 'source_only' : q.basisStatus
   };
-  if (q.basisStatus === 'disputed')
+  if (base.basisStatus === 'disputed')
     return {
       ...base, status: 'disputed', score: null, correct: null, reason: '答案存在争议'
     };
-  if (q.status !== 'ready' || q.basisStatus === 'insufficient' || !q.answer.length || q.kind === 'short')
+  if (!issues.canScore || q.basisStatus === 'insufficient' || !q.answer.length || q.kind === 'short')
     return {
-      ...base, status: 'unscorable', score: null, correct: null, reason: '缺少评分条件或本版不支持此题型评分'
+      ...base, status: 'unscorable', score: null, correct: null, reason: issues.reasons.join('；') || '缺少评分条件或本版不支持此题型评分'
     };
   const norm = (a: string[]) => q.kind === 'multiple' ? [
     ...new Set(a.map(x => x.trim().toUpperCase()))
