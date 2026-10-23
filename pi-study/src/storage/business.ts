@@ -26,6 +26,18 @@ CREATE TABLE IF NOT EXISTS submissions(id TEXT PRIMARY KEY,presentation_id TEXT 
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,event_id TEXT NOT NULL,origin TEXT NOT NULL,action TEXT NOT NULL,presentation_id TEXT,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS review(question_id TEXT PRIMARY KEY REFERENCES questions(id),stage INTEGER NOT NULL,due TEXT NOT NULL,last_correct INTEGER NOT NULL);
 `);
+    this.transaction(()=> {
+    if (!this.db.prepare('PRAGMA table_info(submissions)').all().some(c=>c.name==='voided_at')) {
+      this.db.exec(`
+ALTER TABLE submissions RENAME TO submissions_v1;
+CREATE TABLE submissions(id TEXT PRIMARY KEY,presentation_id TEXT NOT NULL REFERENCES presentations(id),session_id TEXT NOT NULL REFERENCES sessions(id),revision_id TEXT NOT NULL REFERENCES revisions(id),idempotency_key TEXT NOT NULL UNIQUE,input TEXT NOT NULL,receipt TEXT NOT NULL,created_at TEXT NOT NULL,voided_at TEXT);
+INSERT INTO submissions SELECT *,NULL FROM submissions_v1;
+DROP TABLE submissions_v1;
+UPDATE schema_version SET version=2;
+`);
+    }
+    });
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS active_submission ON submissions(presentation_id) WHERE voided_at IS NULL;');
   }
   transaction<T>(fn: () => T): T {
     try {

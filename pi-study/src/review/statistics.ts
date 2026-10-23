@@ -12,7 +12,7 @@ export class StatisticsService {
   async read(input: StatsQuery) {
     const questions = this.store.db.prepare('SELECT q.*,r.payload FROM questions q JOIN revisions r ON r.id=q.current_revision_id WHERE q.bank_id=?').all(input.bankId).filter(q => (!input.sourceId || q.source_id === input.sourceId) && (!input.topic || JSON.parse(String(q.payload)).topics.includes(input.topic)));
     const ids = new Set(questions.map(q => q.id));
-    const rows = this.store.db.prepare('SELECT s.*,r.question_id FROM submissions s JOIN revisions r ON r.id=s.revision_id ORDER BY s.created_at,s.rowid').all().filter(s => ids.has(s.question_id));
+    const rows = this.store.db.prepare('SELECT s.*,r.question_id FROM submissions s JOIN revisions r ON r.id=s.revision_id WHERE s.voided_at IS NULL ORDER BY s.created_at,s.rowid').all().filter(s => ids.has(s.question_id));
     const groups = {
       independent: {
         numerator: 0, denominator: 0

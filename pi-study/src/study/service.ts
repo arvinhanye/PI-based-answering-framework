@@ -18,7 +18,7 @@ export class StudyService {
   }
   private view(s: Row): SessionView {
     return {
-      id: s.id, bankId: s.bank_id, mode: JSON.parse(s.payload).mode ?? 'quick', status: s.status, createdAt: s.created_at, currentPresentationId: s.current_id
+      id: s.id, bankId: s.bank_id, mode: JSON.parse(s.payload).mode ?? 'quick', status: s.status, createdAt: s.created_at, currentPresentationId: s.current_id, sourceId: JSON.parse(s.payload).sourceId, answered: Number(this.row('SELECT count(*) n FROM submissions WHERE session_id=? AND voided_at IS NULL',s.id)!.n)
     };
   }
   private action(a: UserActionContext, verb: string, pid: string) {
@@ -72,16 +72,17 @@ export class StudyService {
       const cfg: StartSessionInput = JSON.parse(s.payload);
       let rows = this.store.db.prepare(`SELECT q.*,r.payload,v.due,v.last_correct FROM questions q JOIN revisions r ON r.id=q.current_revision_id LEFT JOIN review v ON v.question_id=q.id WHERE q.bank_id=? AND NOT EXISTS(SELECT 1 FROM presentations p JOIN revisions old ON old.id=p.revision_id WHERE p.session_id=? AND old.question_id=q.id) ORDER BY q.source_key,q.id`).all(s.bank_id, sessionId) as Row[];
       rows = rows.filter(r => (!cfg.sourceId || r.source_id === cfg.sourceId) && (!cfg.topic || JSON.parse(r.payload).topics.includes(cfg.topic)) && (cfg.selection !== 'wrong' || r.last_correct === 0));
-      if (cfg.selection === 'random')
-        rows.sort(() => Math.random() - .5);
-      else if (!cfg.selection || cfg.selection === 'adaptive') {
+      const sourceRank=(id:string)=>({'first-docx':0,'province-docx':1,'wlan-pdf':2,'pdf':2}[id]??3);
+      rows.sort((a,b)=>sourceRank(a.source_id)-sourceRank(b.source_id)||String(a.source_id).localeCompare(String(b.source_id))||String(a.source_key).localeCompare(String(b.source_key),'en',{numeric:true})||String(a.id).localeCompare(String(b.id)));
+      if (cfg.selection !== 'wrong' && cfg.selection !== 'sequential') {
         const today = localDate(new Date(), cfg.timezone);
-        const due = rows.filter(r => r.last_correct === 0 || (r.due && r.due <= today));
-        const fresh = rows.filter(r => !r.due);
-        const count = Number(this.row('SELECT count(*) AS n FROM presentations WHERE session_id=?', sessionId)!.n);
-        const days = cfg.examDate ? (Date.parse(cfg.examDate) - Date.parse(today)) / 86400000 : Infinity;
-        const ratio = days >= 0 && days <= 14 ? 9 : 4;
-        rows = (count % (ratio + 1) === ratio && fresh.length) ? fresh : due.length ? due : rows;
+        const due = rows.filter(r=>r.last_correct===0||(r.due&&r.due<=today));
+        const fresh = rows.filter(r=>!r.due);
+        if (cfg.randomNew || cfg.selection==='random') {
+          for(let i=fresh.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[fresh[i],fresh[j]]=[fresh[j]!,fresh[i]!];}
+        }
+        const count=Number(this.row('SELECT count(*) n FROM presentations WHERE session_id=?',sessionId)!.n);
+        rows=count%5===4&&fresh.length?fresh:due.length?due:fresh.length?fresh:rows;
       }
       if (!rows.length) {
         this.store.db.prepare('UPDATE sessions SET current_id=NULL WHERE id=?').run(sessionId);
@@ -99,7 +100,7 @@ export class StudyService {
     const s = this.session(sessionId);
     const p = s.current_id ? this.presentation(sessionId) : null;
     return {
-      session: this.view(s), question: p ? this.question(p) : null, draft: p ? JSON.parse(p.draft) : [], assisted: !!p?.assisted
+      session: this.view(s), question: p ? this.question(p) : null, draft: p ? JSON.parse(p.draft) : [], assisted: !!p?.assisted, status: p?.status??null, answer:p?JSON.parse(this.row('SELECT input FROM submissions WHERE presentation_id=? AND voided_at IS NULL',p.id)?.input??'{"answer":[]}').answer:[], progress:this.progress(sessionId)
     };
   }
   async resume(sessionId: string, action: UserActionContext) {
@@ -128,6 +129,7 @@ export class StudyService {
       const raw = JSON.stringify(input);
       const prev = this.row('SELECT * FROM submissions WHERE idempotency_key=?', input.idempotencyKey);
       if (prev) {
+        if(prev.voided_at)throw new CoreError('ALREADY_FINALIZED','该提交已撤销，请重新作答');
         if (prev.input !== raw)
           throw new CoreError('STORAGE_CONFLICT', '幂等键对应不同提交');
         return JSON.parse(prev.receipt);
@@ -143,19 +145,40 @@ export class StudyService {
       const receipt: SubmissionReceipt = {
         id: randomUUID(), presentationId: p.id, grade, assisted: !!p.assisted, createdAt
       };
-      this.store.db.prepare('INSERT INTO submissions VALUES(?,?,?,?,?,?,?,?)').run(receipt.id, p.id, input.sessionId, p.revision_id, input.idempotencyKey, raw, JSON.stringify(receipt), createdAt);
+      this.store.db.prepare('INSERT INTO submissions(id,presentation_id,session_id,revision_id,idempotency_key,input,receipt,created_at) VALUES(?,?,?,?,?,?,?,?)').run(receipt.id, p.id, input.sessionId, p.revision_id, input.idempotencyKey, raw, JSON.stringify(receipt), createdAt);
       this.store.db.prepare("UPDATE presentations SET status='submitted' WHERE id=?").run(p.id);
-      if (grade.status === 'scored') {
-        const old = this.row('SELECT * FROM review WHERE question_id=?', rev.question_id);
-        const stage = grade.correct && !p.assisted && input.confidence === 'sure' ? (old?.stage ?? -1) + 1 : 0;
-        const cfg = JSON.parse(this.session(input.sessionId).payload);
-        const due = scheduleReview({
-          stage, correct: !!grade.correct, assisted: !!p.assisted, confidence: input.confidence, examDate: cfg.examDate, timezone: cfg.timezone
-        }).due;
-        this.store.db.prepare('INSERT INTO review VALUES(?,?,?,?) ON CONFLICT(question_id) DO UPDATE SET stage=excluded.stage,due=excluded.due,last_correct=excluded.last_correct').run(rev.question_id, stage, due, p.assisted && old ? old.last_correct : grade.correct ? 1 : 0);
-      }
+      this.applyReview(rev.question_id,input,receipt,JSON.parse(this.session(input.sessionId).payload));
       return receipt;
     });
+  }
+  private progress(sessionId:string){
+    const rows=this.store.db.prepare('SELECT receipt FROM submissions WHERE session_id=? AND voided_at IS NULL').all(sessionId).map(r=>JSON.parse(String(r.receipt))).filter(r=>r.grade.status==='scored');
+    return {correct:rows.filter(r=>r.grade.correct).length,total:rows.length};
+  }
+  private applyReview(questionId:string,input:SubmissionInput,receipt:SubmissionReceipt,cfg:StartSessionInput){
+    if(receipt.grade.status!=='scored')return;
+    const old=this.row('SELECT * FROM review WHERE question_id=?',questionId);
+    const stage=receipt.grade.correct&&!receipt.assisted&&input.confidence==='sure'?(old?.stage??-1)+1:0;
+    const due=scheduleReview({stage,correct:!!receipt.grade.correct,assisted:receipt.assisted,confidence:input.confidence,examDate:cfg.examDate,timezone:cfg.timezone,now:new Date(receipt.createdAt)}).due;
+    const correct=receipt.assisted&&old?old.last_correct:receipt.grade.correct?1:0;
+    this.store.db.prepare('INSERT INTO review VALUES(?,?,?,?) ON CONFLICT(question_id) DO UPDATE SET stage=excluded.stage,due=excluded.due,last_correct=excluded.last_correct').run(questionId,stage,due,correct);
+  }
+  async markAssisted(sessionId:string,action:UserActionContext,presentationId:string){
+    this.store.transaction(()=>{const p=this.presentation(sessionId,presentationId);if(p.status!=='open'||p.assisted)return;this.action(action,'ask',p.id);this.store.db.prepare('UPDATE presentations SET assisted=1 WHERE id=?').run(p.id);});
+  }
+  async undo(sessionId:string,action:UserActionContext){
+    this.store.transaction(()=>{
+      const p=this.presentation(sessionId);const sub=this.row('SELECT * FROM submissions WHERE presentation_id=? AND voided_at IS NULL',p.id);
+      if(!sub||p.status!=='submitted')throw new CoreError('INVALID_INPUT','只能撤销当前题的作答，进入下一题后无法撤销上一题');
+      this.action(action,'undo',p.id);
+      this.store.db.prepare('UPDATE submissions SET voided_at=? WHERE id=?').run(new Date().toISOString(),sub.id);
+      this.store.db.prepare("UPDATE presentations SET status='open' WHERE id=?").run(p.id);
+      const questionId=this.row('SELECT question_id FROM revisions WHERE id=?',p.revision_id)!.question_id;
+      this.store.db.prepare('DELETE FROM review WHERE question_id=?').run(questionId);
+      const rows=this.store.db.prepare('SELECT x.input,x.receipt,s.payload FROM submissions x JOIN revisions r ON r.id=x.revision_id JOIN sessions s ON s.id=x.session_id WHERE r.question_id=? AND x.voided_at IS NULL ORDER BY x.created_at,x.rowid').all(questionId);
+      for(const r of rows)this.applyReview(questionId,JSON.parse(String(r.input)),JSON.parse(String(r.receipt)),JSON.parse(String(r.payload)));
+    });
+    return this.inspect(sessionId);
   }
   async feedback(presentationId: string): Promise<FeedbackView> {
     const p = this.row('SELECT * FROM presentations WHERE id=?', presentationId);
@@ -164,7 +187,7 @@ export class StudyService {
     ].includes(p.status))
       throw new CoreError('ALREADY_FINALIZED', '提交或明确揭晓后才可查看反馈');
     const q: QuestionInput = JSON.parse(this.row('SELECT payload FROM revisions WHERE id=?', p.revision_id)!.payload);
-    const sub = this.row('SELECT receipt FROM submissions WHERE presentation_id=?', p.id);
+    const sub = this.row('SELECT receipt FROM submissions WHERE presentation_id=? AND voided_at IS NULL', p.id);
     return {
       questionRevisionId: p.revision_id, answer: q.answer, rawAnswer: q.rawAnswer, explanation: q.explanation, issues: q.issues, ...(sub ? {
         grade: JSON.parse(sub.receipt).grade

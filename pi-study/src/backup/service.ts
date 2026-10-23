@@ -39,7 +39,7 @@ export class BackupService {
   if(existsSync(target))throw new Error('恢复必须使用尚不存在的新目录');const {zip,manifest}=this.load(file);mkdirSync(dirname(resolve(target)),{recursive:true});const stage=mkdtempSync(join(dirname(resolve(target)),'.study-restore-'));
   try{
    for(const item of manifest.files){const path=join(stage,item.path);mkdirSync(dirname(path),{recursive:true,mode:0o700});writeFileSync(path,zip.getEntry(item.path)!.getData(),{mode:0o600});}
-   const db=new DatabaseSync(join(stage,'study.sqlite'),{readOnly:true});try{if(db.prepare('PRAGMA integrity_check').get()?.integrity_check!=='ok')throw new Error('数据库完整性校验失败');if(db.prepare('SELECT version FROM schema_version').get()?.version!==1)throw new Error('不支持的业务库版本');}finally{db.close();}
+   const db=new DatabaseSync(join(stage,'study.sqlite'),{readOnly:true});try{if(db.prepare('PRAGMA integrity_check').get()?.integrity_check!=='ok')throw new Error('数据库完整性校验失败');if(![1,2].includes(Number(db.prepare('SELECT version FROM schema_version').get()?.version)))throw new Error('不支持的业务库版本');}finally{db.close();}
    renameSync(stage,target);return resolve(target);
   }catch(e){rmSync(stage,{recursive:true,force:true});throw e;}
  }

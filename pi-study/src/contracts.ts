@@ -26,6 +26,6 @@ export interface SubmissionInput {sessionId:string;presentationId:string;questio
 export interface GradeResult {status:'scored'|'unscorable'|'disputed';score:number|null;maxScore:number;correct:boolean|null;basisStatus:string;reason:string;}
 export interface SubmissionReceipt {id:string;presentationId:string;grade:GradeResult;assisted:boolean;createdAt:string;}
 export interface FeedbackView {questionRevisionId:string;answer:string[];rawAnswer:string;explanation:string;issues:string[];grade?:GradeResult;}
-export interface StartSessionInput {bankId:string;mode?:'quick'|'deep'|'exam';sourceId?:string;topic?:string;selection?:'adaptive'|'random'|'sequential'|'wrong';examDate?:string;timezone?:string;}
-export interface SessionView {id:string;bankId:string;mode:string;status:string;createdAt:string;currentPresentationId:string|null;}
-export interface SessionSnapshot {session:SessionView;question:QuestionView|null;draft:string[];assisted:boolean;}
+export interface StartSessionInput {bankId:string;mode?:'quick'|'deep'|'exam';sourceId?:string;topic?:string;selection?:'adaptive'|'random'|'sequential'|'wrong';randomNew?:boolean;examDate?:string;timezone?:string;}
+export interface SessionView {id:string;bankId:string;mode:string;status:string;createdAt:string;currentPresentationId:string|null;sourceId?:string;answered?:number;}
+export interface SessionSnapshot {session:SessionView;question:QuestionView|null;draft:string[];assisted:boolean;status:'open'|'submitted'|'skipped'|'revealed'|null;answer:string[];progress:{correct:number;total:number};}
