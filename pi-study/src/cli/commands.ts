@@ -28,20 +28,26 @@ export const HELP = `Pi Study 本地刷题（所有分数均为参考成绩）
 公共参数：--data-dir 业务目录、--session 会话ID、--json
 多选写 AC；判断写 正确/错误；填空多个空用 | 分隔。普通文字不计分，answer 命令才提交。
 Pi 内使用 /study 直接开始作答，/study menu 设置。精学/测验/简答等完整功能正在后续阶段实现。`;
-function parse(args: string[]) { const flags: Record<string, string | boolean> = {}, words: string[] = []; const boolean = new Set(['yes', 'json', 'unsure']); const valued = new Set(['data-dir', 'bank', 'source', 'selection', 'topic', 'session', 'to', 'presentation', 'revision', 'key']); for (let i = 0; i < args.length; i++) {
-    const x = args[i]!;
-    if (x.startsWith('--')) {
-        const k = x.slice(2);
-        if (boolean.has(k))
-            flags[k] = true;
-        else if (valued.has(k) && args[i + 1] && !args[i + 1]!.startsWith('--'))
-            flags[k] = args[++i]!;
+function parse(args: string[]) {
+    const flags: Record<string, string | boolean> = {}, words: string[] = [];
+    const boolean = new Set(['yes', 'json', 'unsure']);
+    const valued = new Set(['data-dir', 'bank', 'source', 'selection', 'topic', 'session', 'to', 'presentation', 'revision', 'key']);
+    for (let i = 0; i < args.length; i++) {
+        const x = args[i]!;
+        if (x.startsWith('--')) {
+            const k = x.slice(2);
+            if (boolean.has(k))
+                flags[k] = true;
+            else if (valued.has(k) && args[i + 1] && !args[i + 1]!.startsWith('--'))
+                flags[k] = args[++i]!;
+            else
+                throw new Error('未知或缺值参数: ' + x);
+        }
         else
-            throw new Error('未知或缺值参数: ' + x);
+            words.push(x);
     }
-    else
-        words.push(x);
-} return { flags, words }; }
+    return { flags, words };
+}
 export async function runCli(args: string[], options: {
     home?: string;
     dataDir?: string;
@@ -56,10 +62,18 @@ export async function runCli(args: string[], options: {
     const app = createApp({ ...options, dataDir: str('data-dir') ?? options.dataDir });
     const action = { origin: 'cli' as const, eventId: randomUUID() };
     const bankId = () => str('bank') ?? app.getSetting('activeBank');
-    const requireBank = () => { const id = bankId(); if (!id)
-        throw new Error('请先 bank create/select 或指定 --bank'); return id; };
-    const sid = () => { const id = str('session') ?? app.getSetting('activeSession'); if (!id)
-        throw new Error('请先 start 或 resume 会话'); return id; };
+    const requireBank = () => {
+        const id = bankId();
+        if (!id)
+            throw new Error('请先 bank create/select 或指定 --bank');
+        return id;
+    };
+    const sid = () => {
+        const id = str('session') ?? app.getSetting('activeSession');
+        if (!id)
+            throw new Error('请先 start 或 resume 会话');
+        return id;
+    };
     const timezone = () => app.getSetting('timezone') ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
     const display = (q: QuestionView | null) => q ? { ...q, assets: q.assets.map(a => ({ ...a, path: resolve(app.dataDir, a.path) })) } : null;
     try {
@@ -227,7 +241,7 @@ export function renderCli(result: any): string {
     if (result?.question) {
         if (result.feedback)
             return resultCard(result.question, result.answer, result.feedback, result.budget).replace('n 下一题', 'study next 下一题').replace('直接打字问 DeepSeek', '在 Pi 中提问').replace('/study undo', 'study undo');
-        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('Ctrl+Alt+N', 'study next').replaceAll('Ctrl+Alt+O 打开', '见题图文件').replaceAll('/study menu 设置', 'study help 帮助').replaceAll('/study exit 退出', '终端 Ctrl+C 退出').replaceAll('直接打字问 DeepSeek', '在 Pi 中提问') + (result.question.assets.length ? '\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
+        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('n / Ctrl+Alt+N', 'study next').replaceAll('Ctrl+Alt+O 打开', '见题图文件').replaceAll('/study menu 设置', 'study help 帮助').replaceAll('/study exit 退出', '终端 Ctrl+C 退出').replaceAll('输入 =答案（多空用 | 分隔）', "study answer '第一空|第二空' 提交填空").replaceAll('输入答案', 'study answer A 提交答案').replaceAll('直接打字问 DeepSeek', '在 Pi 中提问') + (result.question.assets.length ? '\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
     }
     if (result?.question === null)
         return '本轮已完成；study start 开新一轮。';

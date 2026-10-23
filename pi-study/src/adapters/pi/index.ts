@@ -10,23 +10,36 @@ import { ControlledSession, MODEL, PROVIDER } from './session.js';
 import { safeQuestionImages } from './images.js';
 import { questionContext, STUDY_SYSTEM } from './context.js';
 import { scheduleReview } from '../../review/scheduler.js';
+import type { SessionSnapshot } from '../../contracts.js';
 import type { BudgetTicket } from '../../budget/ledger.js';
 const noKey = '未配置 DeepSeek，答题不受影响。在 Pi 用 /login 配置 DeepSeek，或在启动 Pi 的终端设置 DEEPSEEK_API_KEY，然后重新提问。';
 export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
     const controlled = new ControlledSession(pi);
-    let busy = false, boundary = '', presentation = '', request: BudgetTicket | undefined, requestContext: Awaited<ReturnType<typeof questionContext>> = [];
+    let busy = false, boundary = '', presentation = '', displayedSession = '', request: BudgetTicket | undefined, requestContext: Awaited<ReturnType<typeof questionContext>> = [];
     const action = () => ({ origin: 'pi-interactive' as const, eventId: randomUUID() });
-    const sid = () => { const id = app.getSetting('activeSession'); if (!id)
-        throw Error('输入 /study 开始刷题'); return id; };
+    const sid = () => {
+        const id = app.getSetting('activeSession');
+        if (!id)
+            throw Error('输入 /study 开始刷题');
+        return id;
+    };
     const send = (content: string, details: Record<string, unknown> = {}) => pi.sendMessage({ customType: 'study-card', content, display: true, details });
-    const status = (ctx: ExtensionContext) => { if (!controlled.active) {
-        ctx.ui.setStatus('study', undefined);
-        ctx.ui.setWidget('study-help', undefined);
-        return;
-    } const b = app.budget.snapshot(); ctx.ui.setStatus('study', `学习 · ${pi.getThinkingLevel() === 'off' ? '' : '思考 · '}本月 ${b.spentCny} / ${b.limitCny} 元`); ctx.ui.setWidget('study-help', ['输入答案或提问 · n / Ctrl+Alt+N 下一题 · Ctrl+Alt+O 题图 · /study menu 设置 · /study exit 退出']); };
+    const status = (ctx: ExtensionContext) => {
+        if (!controlled.active) {
+            ctx.ui.setStatus('study', undefined);
+            ctx.ui.setWidget('study-help', undefined);
+            return;
+        }
+        const b = app.budget.snapshot();
+        ctx.ui.setStatus('study', `学习 · ${pi.getThinkingLevel() === 'off' ? '' : '思考 · '}本月 ${b.spentCny} / ${b.limitCny} 元`);
+        ctx.ui.setWidget('study-help', ['输入答案或提问 · n / Ctrl+Alt+N 下一题 · Ctrl+Alt+O 题图 · /study menu 设置 · /study exit 退出']);
+    };
     const display = async (ctx: ExtensionContext) => {
         const s = await app.study.inspect(sid()), q = s.question;
+        displayedSession = s.session.id;
         if (!q) {
+            presentation = '';
+            boundary = '';
             send('本轮已完成。/study 1500、/study 省赛、/study pdf 开新一轮；/study menu 设置；/study exit 退出。');
             status(ctx);
             return;
@@ -43,8 +56,22 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             send(resultCard(q, s.answer, await app.study.feedback(q.presentationId), app.budget.snapshot()));
         status(ctx);
     };
-    const advance = async (ctx: ExtensionContext) => { const s = await app.study.inspect(sid()); if (s.question && s.status === 'open')
-        await app.study.skip(sid(), action(), s.question.presentationId); await app.study.next(sid()); await display(ctx); };
+    const ensureShown = async (ctx: ExtensionContext, s: SessionSnapshot) => {
+        if (displayedSession === s.session.id && presentation === (s.question?.presentationId ?? ''))
+            return true;
+        await display(ctx);
+        send('题目已在其他窗口变化，已刷新；请按新题重新输入。');
+        return false;
+    };
+    const advance = async (ctx: ExtensionContext) => {
+        const s = await app.study.inspect(sid());
+        if (!await ensureShown(ctx, s))
+            return;
+        if (s.question && s.status === 'open')
+            await app.study.skip(s.session.id, action(), s.question.presentationId);
+        await app.study.next(s.session.id);
+        await display(ctx);
+    };
     const setDate = async (ctx: ExtensionContext) => {
         const value = await ctx.ui.input('比赛日期（YYYY-MM-DD，留空或 Esc 跳过）', app.getSetting('examDate') ?? '');
         if (value === undefined)
@@ -88,12 +115,21 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
     };
     const menu = async (ctx: ExtensionContext) => {
         const banks = await app.banks.list(), sessions = await app.study.listSessions();
-        const rows = [...banks.map(b => ({ label: '切换题库 · ' + b.name, run: async () => { app.setSetting('activeBank', b.id); app.setSetting('activeSession', ''); await start('', ctx); } })), ...sessions.map(s => ({ label: `恢复 · ${s.sourceId ? sourceLabel(s.sourceId) : '全库'} · ${new Date(s.createdAt).toLocaleString('zh-CN')} · 已做 ${s.answered ?? 0} 题`, run: async () => { await app.study.resume(s.id, action()); app.setSetting('activeSession', s.id); app.setSetting('activeBank', s.bankId); await controlled.enter(ctx); await display(ctx); } })), { label: '成绩', run: async () => { const b = app.getSetting('activeBank'); if (!b)
-                    return; const stats = await app.stats.read({ bankId: b, timezone: app.getSetting('timezone') }); send(`成绩（参考）\n正确 ${stats.historical.numerator} / 已判分 ${stats.historical.denominator}\n${Object.entries(stats.current).map(([label, v]) => `${label === 'independent' ? '独立作答' : '辅助作答'}：${v.numerator} / ${v.denominator}`).join('\n')}`); } }, { label: '预算', run: async () => { const b = app.budget.snapshot(); const v = await ctx.ui.input(`本月已用 ${b.spentCny} 元，修改月上限`, b.limitCny); if (v !== undefined && v.trim()) {
-                    app.budget.setLimit(v.trim());
-                    send(`月上限已设为 ${app.budget.snapshot().limitCny} 元`);
-                    status(ctx);
-                } } }, { label: '比赛日期', run: () => setDate(ctx) }, { label: `答对自动下一题：${app.getSetting('autoNext') === 'true' ? '开' : '关'}`, run: async () => { const value = app.getSetting('autoNext') !== 'true'; app.setSetting('autoNext', String(value)); send(`答对自动下一题已${value ? '开启' : '关闭'}`); } }];
+        const rows = [...banks.map(b => ({ label: '切换题库 · ' + b.name, run: async () => { app.setSetting('activeBank', b.id); app.setSetting('activeSession', ''); await start('', ctx); } })), ...sessions.map(s => ({ label: `恢复 · ${s.sourceId ? sourceLabel(s.sourceId) : '全库'} · ${new Date(s.createdAt).toLocaleString('zh-CN')} · 已做 ${s.answered ?? 0} 题`, run: async () => { await app.study.resume(s.id, action()); app.setSetting('activeSession', s.id); app.setSetting('activeBank', s.bankId); await controlled.enter(ctx); await display(ctx); } })), { label: '成绩', run: async () => {
+                    const b = app.getSetting('activeBank');
+                    if (!b)
+                        return;
+                    const stats = await app.stats.read({ bankId: b, timezone: app.getSetting('timezone') });
+                    send(`成绩（参考）\n正确 ${stats.historical.numerator} / 已判分 ${stats.historical.denominator}\n${Object.entries(stats.current).map(([label, v]) => `${label === 'independent' ? '独立作答' : '辅助作答'}：${v.numerator} / ${v.denominator}`).join('\n')}`);
+                } }, { label: '预算', run: async () => {
+                    const b = app.budget.snapshot();
+                    const v = await ctx.ui.input(`本月已用 ${b.spentCny} 元，修改月上限`, b.limitCny);
+                    if (v !== undefined && v.trim()) {
+                        app.budget.setLimit(v.trim());
+                        send(`月上限已设为 ${app.budget.snapshot().limitCny} 元`);
+                        status(ctx);
+                    }
+                } }, { label: '比赛日期', run: () => setDate(ctx) }, { label: `答对自动下一题：${app.getSetting('autoNext') === 'true' ? '开' : '关'}`, run: async () => { const value = app.getSetting('autoNext') !== 'true'; app.setSetting('autoNext', String(value)); send(`答对自动下一题已${value ? '开启' : '关闭'}`); } }];
         const choice = await ctx.ui.select('学习设置（Esc 返回当前题）', rows.map((r, i) => `${i + 1}. ${r.label}`));
         if (choice) {
             const i = Number(choice.split('.')[0]) - 1;
@@ -101,18 +137,22 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
         }
         status(ctx);
     };
-    const guarded = async (ctx: ExtensionContext, fn: () => Promise<unknown>) => { if (busy) {
-        send('操作正在完成，请稍候。');
-        return;
-    } busy = true; try {
-        await fn();
-    }
-    catch (e) {
-        send(e instanceof Error ? e.message : '操作失败，请重试。');
-    }
-    finally {
-        busy = false;
-    } };
+    const guarded = async (ctx: ExtensionContext, fn: () => Promise<unknown>) => {
+        if (busy) {
+            send('操作正在完成，请稍候。');
+            return;
+        }
+        busy = true;
+        try {
+            await fn();
+        }
+        catch (e) {
+            send(e instanceof Error ? e.message : '操作失败，请重试。');
+        }
+        finally {
+            busy = false;
+        }
+    };
     pi.registerMessageRenderer('study-card', (message, options) => new Text(String(message.content), options.outputPad, 1));
     pi.registerCommand('study', { description: '刷题；menu 设置 / undo 撤销 / think 思考 / budget 金额 / exit 退出', handler: async (args, ctx) => guarded(ctx, async () => {
             const text = args.trim();
@@ -146,7 +186,10 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
                 return;
             }
             if (text === 'undo') {
-                await app.study.undo(sid(), action());
+                const snapshot = await app.study.inspect(sid());
+                if (!await ensureShown(ctx, snapshot))
+                    return;
+                await app.study.undo(snapshot.session.id, action());
                 await display(ctx);
                 return;
             }
@@ -163,20 +206,36 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             }
             await start(text, ctx);
         }) });
-    pi.registerShortcut('ctrl+alt+n', { description: '学习：下一题', handler: async (ctx) => { if (controlled.active)
-            await guarded(ctx, async () => { if (!ctx.isIdle()) {
-                send('按 Esc 停止回答后可换题。');
-                return;
-            } await advance(ctx); }); } });
-    pi.registerShortcut('ctrl+alt+o', { description: '学习：打开当前题图', handler: async (ctx) => { if (controlled.active)
-            await guarded(ctx, async () => { const q = (await app.study.inspect(sid())).question; const images = q ? safeQuestionImages(app.dataDir, q.assets) : []; if (!images.length) {
-                send('当前题没有题图。');
-                return;
-            } const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? undefined : 'xdg-open'; if (command)
-                await promisify(execFile)(command, [images[0]!.path]);
-            else
-                send(images[0]!.path); if (images.length > 1)
-                send(`共有 ${images.length} 张题图，已打开第一张。\n${images.map(x => x.path).join('\n')}`); }); } });
+    pi.registerShortcut('ctrl+alt+n', { description: '学习：下一题', handler: async (ctx) => {
+            if (controlled.active)
+                await guarded(ctx, async () => {
+                    if (!ctx.isIdle()) {
+                        send('按 Esc 停止回答后可换题。');
+                        return;
+                    }
+                    await advance(ctx);
+                });
+        } });
+    pi.registerShortcut('ctrl+alt+o', { description: '学习：打开当前题图', handler: async (ctx) => {
+            if (controlled.active)
+                await guarded(ctx, async () => {
+                    const snapshot=await app.study.inspect(sid());
+                    if(!await ensureShown(ctx,snapshot))return;
+                    const q = snapshot.question;
+                    const images = q ? safeQuestionImages(app.dataDir, q.assets) : [];
+                    if (!images.length) {
+                        send('当前题没有题图。');
+                        return;
+                    }
+                    const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? undefined : 'xdg-open';
+                    if (command)
+                        await promisify(execFile)(command, [images[0]!.path]);
+                    else
+                        send(images[0]!.path);
+                    if (images.length > 1)
+                        send(`共有 ${images.length} 张题图，已打开第一张。\n${images.map(x => x.path).join('\n')}`);
+                });
+        } });
     pi.on('input', async (event, ctx) => {
         if (!controlled.active)
             return { action: 'continue' };
@@ -191,6 +250,8 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
         let ask = false;
         await guarded(ctx, async () => {
             const s = await app.study.inspect(sid()), q = s.question;
+            if (!await ensureShown(ctx, s))
+                return;
             if (!q) {
                 send('本轮已完成。用 /study 1500 或 /study menu 开始下一轮。');
                 return;
@@ -209,7 +270,7 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
                     send('这题已作答；n 下一题，/study undo 撤销后重答。');
                     return;
                 }
-                const receipt = await app.study.submit({ sessionId: sid(), presentationId: q.presentationId, questionRevisionId: q.questionRevisionId, answer: parsed.answer, confidence: parsed.confidence, idempotencyKey: randomUUID() }, action());
+                const receipt = await app.study.submit({ sessionId: s.session.id, presentationId: q.presentationId, questionRevisionId: q.questionRevisionId, answer: parsed.answer, confidence: parsed.confidence, idempotencyKey: randomUUID() }, action());
                 send(resultCard(q, parsed.answer, await app.study.feedback(q.presentationId), app.budget.snapshot()));
                 status(ctx);
                 if (receipt.grade.correct && app.getSetting('autoNext') === 'true')
@@ -222,32 +283,50 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             }
             request = app.budget.begin();
             requestContext = await questionContext(app, s);
-            await app.study.markAssisted(sid(), action(), q.presentationId);
+            await app.study.markAssisted(s.session.id, action(), q.presentationId);
             ask = true;
         });
         return { action: ask ? 'continue' : 'handled' };
     });
-    pi.on('before_agent_start', async () => { if (controlled.active)
-        return { systemPrompt: STUDY_SYSTEM }; });
-    pi.on('context', event => { if (!controlled.active)
-        return; const i = event.messages.findLastIndex(m => m.role === 'custom' && m.customType === 'study-card' && (m.details as any)?.boundary === boundary); const messages = i < 0 ? event.messages.slice(-1) : event.messages.slice(i + 1); return { messages: [{ role: 'user' as const, content: requestContext, timestamp: Date.now() }, ...messages.filter(m => m.role === 'user' || m.role === 'assistant')] }; });
-    pi.on('message_end', (event, ctx) => { const m = event.message; if (!request || m.role !== 'assistant' || m.provider !== PROVIDER || m.model !== MODEL)
-        return; const id = request.id + ':' + m.timestamp + ':' + createHash('sha256').update(JSON.stringify([m.content, m.usage])).digest('hex'); const result = app.budget.record({ ...request, id }, m.usage); if (result.warn80)
-        send('本月 DeepSeek 用量已达到上限的 80%。可用 /study budget 调整。'); status(ctx); });
-    pi.on('agent_end', () => { request = undefined; });
-    pi.on('session_before_compact', () => controlled.active ? { cancel: true } : undefined);
-    pi.on('model_select', async (event, ctx) => { if (await controlled.switched(event.model)) {
-        boundary = '';
-        presentation = '';
+    pi.on('before_agent_start', async () => {
+        if (controlled.active)
+            return { systemPrompt: STUDY_SYSTEM };
+    });
+    pi.on('context', event => {
+        if (!controlled.active)
+            return;
+        const i = event.messages.findLastIndex(m => m.role === 'custom' && m.customType === 'study-card' && (m.details as any)?.boundary === boundary);
+        const messages = i < 0 ? event.messages.slice(-1) : event.messages.slice(i + 1);
+        return { messages: [{ role: 'user' as const, content: requestContext, timestamp: Date.now() }, ...messages.filter(m => m.role === 'user' || m.role === 'assistant')] };
+    });
+    pi.on('message_end', (event, ctx) => {
+        const m = event.message;
+        if (!request || m.role !== 'assistant' || m.provider !== PROVIDER || m.model !== MODEL)
+            return;
+        const id = request.id + ':' + m.timestamp + ':' + createHash('sha256').update(JSON.stringify([m.content, m.usage])).digest('hex');
+        const result = app.budget.record({ ...request, id }, m.usage);
+        if (result.warn80)
+            send('本月 DeepSeek 用量已达到上限的 80%。可用 /study budget 调整。');
         status(ctx);
-        send('已随模型切换退出学习，工具已恢复。/study 可继续刷题。');
-    } });
-    pi.on('session_shutdown', async (event) => { try {
-        await controlled.exit(event.reason !== 'quit');
-    }
-    finally {
-        app.close();
-    } });
+    });
+    pi.on('agent_settled', () => { request = undefined; });
+    pi.on('session_before_compact', () => controlled.active ? { cancel: true } : undefined);
+    pi.on('model_select', async (event, ctx) => {
+        if (await controlled.switched(event.model)) {
+            boundary = '';
+            presentation = '';
+            status(ctx);
+            send('已随模型切换退出学习，工具已恢复。/study 可继续刷题。');
+        }
+    });
+    pi.on('session_shutdown', async (event) => {
+        try {
+            await controlled.exit(event.reason !== 'quit');
+        }
+        finally {
+            app.close();
+        }
+    });
     return controlled;
 }
 export default function (pi: ExtensionAPI) { registerStudy(pi, createApp()); }
