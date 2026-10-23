@@ -1,0 +1,386 @@
+{
+  "schemaVersion": 1,
+  "id": "ict-network-topics-v1",
+  "status": "draft-awaiting-user-confirmation",
+  "description": "根据当前三份题库内容拟定的学习分类；不是官方赛纲，不会自动启用。",
+  "assignmentPolicy": {
+    "primaryTopics": 1,
+    "maxSecondaryTopics": 1,
+    "classifyBy": "核心考查目标，而非关键词出现次数",
+    "sourceLabels": "保留原始来源标签及优先级，模型建议单独存储，不覆盖来源标签",
+    "sourceLabelAliases": {
+      "无线": "wlan",
+      "安全": "security"
+    },
+    "broadSourceLabelsToPreserve": [
+      "数通"
+    ],
+    "placeholderLabels": [
+      "未分类",
+      ""
+    ],
+    "uncertain": "保留待抽查状态，不强塞到任意类别"
+  },
+  "execution": {
+    "enabled": false,
+    "modelCallsMade": 0,
+    "labelsWritten": 0,
+    "nextGate": "用户确认分类表后，另行展示 50 题试跑范围和费用，获确认才发送；全量再单独确认"
+  },
+  "topics": [
+    {
+      "id": "network_basics",
+      "label": "网络基础与以太网",
+      "aliases": [
+        "网络基础",
+        "以太网",
+        "物理层"
+      ],
+      "includes": [
+        "OSI/TCP-IP 分层、封装、以太网帧与介质",
+        "网线、光纤、光模块、带宽与双工"
+      ],
+      "boundary": "问交换机所在层次归此类；问 VLAN/STP 转发机制归二层交换。",
+      "examples": [
+        {
+          "sourceId": "province-docx",
+          "sourceKey": "p1",
+          "focus": "568B 双绞线制作"
+        },
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "154",
+          "focus": "交换机的 OSI 层次"
+        }
+      ]
+    },
+    {
+      "id": "ip_transport",
+      "label": "IP 编址与传输",
+      "aliases": [
+        "IP 基础",
+        "IP",
+        "TCP/IP",
+        "IPv4",
+        "IPv6"
+      ],
+      "includes": [
+        "IPv4/IPv6 地址、子网划分、ARP/ICMP、分片与 MTU",
+        "TCP/UDP、端口与连接过程"
+      ],
+      "boundary": "问 IPv6 地址归此类；问 OSPFv3/IPv6 路由选择归路由。",
+      "examples": [
+        {
+          "sourceId": "wlan-pdf",
+          "sourceKey": "p1-q3",
+          "focus": "TCP 抓包与连接建立"
+        }
+      ]
+    },
+    {
+      "id": "switching",
+      "label": "二层交换",
+      "aliases": [
+        "交换",
+        "VLAN",
+        "STP"
+      ],
+      "includes": [
+        "VLAN、QinQ、STP/RSTP/MSTP、MAC 学习与转发",
+        "Eth-Trunk、堆叠、二层环路与可靠性"
+      ],
+      "boundary": "问优先级如何排队归 QoS；问 VLAN 划分及标签转发归此类。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "149",
+          "focus": "按场景选择 VLAN 划分方式"
+        },
+        {
+          "sourceId": "province-docx",
+          "sourceKey": "p486",
+          "focus": "Eth-Trunk 链路聚合"
+        }
+      ]
+    },
+    {
+      "id": "routing",
+      "label": "路由",
+      "aliases": [
+        "路由协议",
+        "OSPF",
+        "BGP",
+        "IS-IS"
+      ],
+      "includes": [
+        "静态路由、路由表、最长匹配、策略路由",
+        "OSPF/OSPFv3、RIP、IS-IS、BGP、组播、VRRP/BFD"
+      ],
+      "boundary": "问 MPLS VPN 标签/隧道归广域网与 VPN；问 BGP 选路归此类。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "96",
+          "focus": "OSPF 邻居状态"
+        }
+      ]
+    },
+    {
+      "id": "network_services",
+      "label": "网络服务",
+      "aliases": [
+        "DHCP",
+        "DNS",
+        "NAT",
+        "NTP"
+      ],
+      "includes": [
+        "DHCP、DNS、NAT/NAPT、NTP",
+        "FTP/TFTP、HTTP 等服务机制及配置"
+      ],
+      "boundary": "问远程登录账号/权限、设备升级操作归网络运维；问服务协议本身归此类。",
+      "examples": [
+        {
+          "sourceId": "wlan-pdf",
+          "sourceKey": "p24-q103",
+          "focus": "DHCP 地址池分配"
+        }
+      ]
+    },
+    {
+      "id": "wlan",
+      "label": "WLAN",
+      "aliases": [
+        "无线",
+        "Wi-Fi",
+        "无线局域网"
+      ],
+      "includes": [
+        "802.11、射频、信道、天线、覆盖与漫游",
+        "AP/AC、CAPWAP、无线接入流程与无线专属认证加密"
+      ],
+      "boundary": "WEP/WPA、无线接入认证以无线机制为目标时归此类；通用密码学或安全设备策略归网络安全。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "111",
+          "focus": "FIT AP 与 AC 通信"
+        },
+        {
+          "sourceId": "province-docx",
+          "sourceKey": "p981",
+          "focus": "无线用户接入流程"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "label": "网络安全",
+      "aliases": [
+        "安全",
+        "防火墙",
+        "访问控制"
+      ],
+      "includes": [
+        "防火墙、安全域、ACL、AAA、访问控制",
+        "攻击防护、IPS/IDS、密码与证书、安全审计"
+      ],
+      "boundary": "IPSec/SSL VPN 的隧道组网归广域网与 VPN；加密/认证/防攻击原理归此类。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "22",
+          "focus": "IPS 功能辨析"
+        }
+      ]
+    },
+    {
+      "id": "wan_vpn",
+      "label": "广域网与 VPN",
+      "aliases": [
+        "广域网",
+        "VPN",
+        "MPLS",
+        "PPP"
+      ],
+      "includes": [
+        "PPP/PPPoE、HDLC、广域接入",
+        "MPLS、GRE、L2TP、IPSec/SSL VPN 的隧道和互联"
+      ],
+      "boundary": "VXLAN/EVPN 数据中心互联归 SDN 与数据中心；VPN 密码算法归网络安全。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "286",
+          "focus": "PPPoE 会话标识"
+        }
+      ]
+    },
+    {
+      "id": "qos",
+      "label": "QoS",
+      "aliases": [
+        "服务质量",
+        "流量管理"
+      ],
+      "includes": [
+        "分类、标记、DSCP/802.1p、信任优先级",
+        "监管、整形、调度、拥塞避免与限速"
+      ],
+      "boundary": "按核心问题判断：数据中心场景里的通用拥塞算法仍归此类；整体 Fabric 方案归 SDN 与数据中心。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "337",
+          "focus": "拥塞避免技术"
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "label": "网络运维",
+      "aliases": [
+        "网络管理",
+        "运维",
+        "SNMP",
+        "eSight"
+      ],
+      "includes": [
+        "VRP 使用、设备文件/软件管理、远程管理与权限",
+        "SNMP、Syslog、Telemetry、NQA、监控、诊断及故障定位"
+      ],
+      "boundary": "只有出现故障场景不自动归此类；OSPF 邻居/选路故障仍归路由，编写诊断脚本归网络自动化。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "793",
+          "focus": "SNMP 版本"
+        },
+        {
+          "sourceId": "province-docx",
+          "sourceKey": "p237",
+          "focus": "Telnet 设备远程管理"
+        }
+      ]
+    },
+    {
+      "id": "sdn_datacenter",
+      "label": "SDN 与数据中心",
+      "aliases": [
+        "SDN",
+        "数据中心",
+        "VXLAN",
+        "CloudFabric",
+        "NCE-Fabric"
+      ],
+      "includes": [
+        "SDN 架构、控制器、VXLAN/EVPN、Fabric",
+        "CloudFabric、iMaster NCE-Fabric、数据中心互联与方案编排"
+      ],
+      "boundary": "OpenStack 组件/云资源管理归云计算与虚拟化；用 API/Python 操作控制器的编程细节归网络自动化。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "459",
+          "focus": "NCE-Fabric 业务仿真"
+        }
+      ]
+    },
+    {
+      "id": "automation",
+      "label": "网络自动化与编程",
+      "aliases": [
+        "网络自动化",
+        "自动化",
+        "Python",
+        "NETCONF"
+      ],
+      "includes": [
+        "Python 与编程基础、脚本远程操作",
+        "NETCONF/RESTCONF、YANG、API、JSON/XML、Ansible"
+      ],
+      "boundary": "问协议管理功能而非脚本或接口调用时归网络运维；不因题干出现 Python 字样就机械分类。",
+      "examples": [
+        {
+          "sourceId": "wlan-pdf",
+          "sourceKey": "p96-q409",
+          "focus": "Python Telnet 自动化脚本"
+        },
+        {
+          "sourceId": "province-docx",
+          "sourceKey": "p729",
+          "focus": "解释型编程语言"
+        }
+      ]
+    },
+    {
+      "id": "cloud_virtualization",
+      "label": "云计算与虚拟化",
+      "aliases": [
+        "云计算",
+        "虚拟化",
+        "OpenStack"
+      ],
+      "includes": [
+        "云服务模型、云资源管理与 OpenStack 组件",
+        "虚拟机、Hypervisor、FusionCompute/FusionSphere、容器平台"
+      ],
+      "boundary": "Linux 命名空间/资源隔离原理归服务器与操作系统；存储协议、介质、后端能力归存储。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "435",
+          "focus": "OpenStack 网络资源组件"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "label": "存储",
+      "aliases": [
+        "存储基础",
+        "SAN",
+        "NAS",
+        "RAID"
+      ],
+      "includes": [
+        "块/文件/对象存储、SAN/NAS、RAID、SCSI",
+        "分布式存储、存储后端与可靠性"
+      ],
+      "boundary": "仅问 Cinder/Swift 的云组件职责可归云计算；问存储类型或后端支持归此类。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "1494",
+          "focus": "Cinder 存储后端类型"
+        }
+      ]
+    },
+    {
+      "id": "server_os",
+      "label": "服务器与操作系统",
+      "aliases": [
+        "操作系统",
+        "Linux",
+        "服务器"
+      ],
+      "includes": [
+        "服务器硬件、CPU/内存、进程、文件系统",
+        "Linux/Windows 基础、命名空间及系统资源隔离"
+      ],
+      "boundary": "安全场景中排查恶意任务归网络安全；路由器 VRP 命令归网络运维，不因 CPU/进程字样误归此类。",
+      "examples": [
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "414",
+          "focus": "Linux 命名空间与进程隔离"
+        },
+        {
+          "sourceId": "first-docx",
+          "sourceKey": "1072",
+          "focus": "本地存储文件系统"
+        }
+      ]
+    }
+  ]
+}

@@ -27,6 +27,7 @@
     "native/build.sh",
     "schema",
     "examples",
+    "config",
     "README.md",
     "docs"
   ],
