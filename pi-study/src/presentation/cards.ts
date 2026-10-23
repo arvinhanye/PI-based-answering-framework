@@ -14,7 +14,7 @@ export function questionCard(q: QuestionView, progress: {
 }, budget: CardBudget, label = sourceLabel(q.sourceId)): string {
     const header = [`第 ${q.sourceKey} 题`, kinds[q.kind], ...q.topics, label].join(' · ');
     const images = q.assets.filter(a => a.role === 'question').length;
-    const sections = [header + '\n' + displayStem(q.stem), q.options.map(o => `${o.id}. ${o.text}`).join('\n'), [images ? `📎 ${images} 张题图，Ctrl+Alt+O 打开` : '', q.warnings?.length ? `⚠ ${q.warnings.join('；')}，本题不计分` : ''].filter(Boolean).join('\n')];
+    const sections = [header + '\n' + displayStem(q.stem), q.options.map(o => `${o.id}. ${o.text}`).join('\n'), [images ? `📎 ${images} 张题图，输入 图 打开` : '', q.warnings?.length ? `⚠ ${q.warnings.join('；')}，本题不计分` : ''].filter(Boolean).join('\n')];
     return sections.filter(Boolean).join('\n\n');
 }
 export function resultCard(q: QuestionView, answer: string[], feedback: FeedbackView, budget: CardBudget): string {

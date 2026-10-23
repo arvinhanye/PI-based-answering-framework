@@ -11,3 +11,7 @@ it('rejects invalid boolean and empty explicit fill',()=>{expect(classifyStudyIn
 it.each(['B为什么不对','什么是 Mesh','OSPF','display ip routing-table'])('leaves ambiguous prose as a question %s',text=>expect(classifyStudyInput(text,question()).type).toBe('question'));
 it('fill requires equals and retains internal spaces and case',()=>{expect(classifyStudyInput('display ip routing-table',question('fill')).type).toBe('question');expect(classifyStudyInput('= display ip routing-table | My Answer',question('fill'))).toEqual({type:'answer',answer:['display ip routing-table','My Answer'],confidence:'sure'});});
 it.each(['n','N','下'])('routes next shortcut %s',text=>expect(classifyStudyInput(text,question())).toEqual({type:'next'}));
+it.each(['single','multiple','truefalse','fill','short'] as const)('图 is an image action before %s answer parsing',kind=>{
+ expect(classifyStudyInput(' 图 ',{kind,options:[{id:'A',text:'甲'}]})).toEqual({type:'image'});
+ expect(classifyStudyInput('这张图怎么理解',{kind,options:[]})).toEqual({type:'question'});
+});

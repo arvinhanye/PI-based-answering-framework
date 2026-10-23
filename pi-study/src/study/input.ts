@@ -2,6 +2,8 @@ import type { QuestionView } from '../contracts.js';
 export type StudyInput = {
     type: 'next';
 } | {
+    type: 'image';
+} | {
     type: 'answer';
     answer: string[];
     confidence: 'sure' | 'unsure';
@@ -15,6 +17,8 @@ export function classifyStudyInput(text: string, question: Pick<QuestionView, 'k
     let value = text.trim();
     if (/^(n|下)$/i.test(value))
         return { type: 'next' };
+    if (value === '图')
+        return { type: 'image' };
     const prefixed = /^(答案是|选择|答案|我选|选)\s*/.test(value);
     value = value.replace(/^(答案是|选择|答案|我选|选)\s*/, '');
     const confidence = /[?？]$/.test(value) ? 'unsure' : 'sure';

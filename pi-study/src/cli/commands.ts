@@ -242,7 +242,7 @@ export function renderCli(result: any): string {
     if (result?.question) {
         if (result.feedback)
             return resultCard(result.question, result.answer, result.feedback, result.budget);
-        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('Ctrl+Alt+O 打开', '见题图文件') + (result.question.assets.length ? '\n\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
+        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('输入 图 打开', '见题图文件') + (result.question.assets.length ? '\n\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
     }
     if (result?.question === null)
         return '本轮已完成；study start 开新一轮。';

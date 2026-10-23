@@ -209,7 +209,7 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             }
             await start(text, ctx);
         }) });
-    pi.registerShortcut('ctrl+alt+n', { description: '学习：下一题', handler: async (ctx) => {
+    pi.registerShortcut('ctrl+n', { description: '学习：下一题', handler: async (ctx) => {
             if (controlled.active)
                 await guarded(ctx, async () => {
                     if (!ctx.isIdle()) {
@@ -217,26 +217,6 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
                         return;
                     }
                     await advance(ctx);
-                });
-        } });
-    pi.registerShortcut('ctrl+alt+o', { description: '学习：打开当前题图', handler: async (ctx) => {
-            if (controlled.active)
-                await guarded(ctx, async () => {
-                    const snapshot=await app.study.inspect(sid());
-                    if(!await ensureShown(ctx,snapshot))return;
-                    const q = snapshot.question;
-                    const images = q ? safeQuestionImages(app.dataDir, q.assets) : [];
-                    if (!images.length) {
-                        send('当前题没有题图。');
-                        return;
-                    }
-                    const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? undefined : 'xdg-open';
-                    if (command)
-                        await promisify(execFile)(command, [images[0]!.path]);
-                    else
-                        send(images[0]!.path);
-                    if (images.length > 1)
-                        send(`共有 ${images.length} 张题图，已打开第一张。\n${images.map(x => x.path).join('\n')}`);
                 });
         } });
     pi.on('input', async (event, ctx) => {
@@ -262,6 +242,18 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             const parsed = classifyStudyInput(event.text, q);
             if (parsed.type === 'next') {
                 await advance(ctx);
+                return;
+            }
+            if (parsed.type === 'image') {
+                const images = safeQuestionImages(app.dataDir, q.assets);
+                if (!images.length) {
+                    send('当前题没有题图。');
+                    return;
+                }
+                const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? undefined : 'xdg-open';
+                if (command) await promisify(execFile)(command, [images[0]!.path]);
+                else send(images[0]!.path);
+                if (images.length > 1) send(`共有 ${images.length} 张题图，已打开第一张。\n${images.map(x => x.path).join('\n')}`);
                 return;
             }
             if (parsed.type === 'invalid') {

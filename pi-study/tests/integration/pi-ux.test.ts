@@ -22,7 +22,7 @@ it('AI usage outside study is not charged and 80% warning appears once',async()=
 it('usage remains attributable across automatic retry agent_end until final settlement',async()=>{const h=await setup();await h.command();await h.input('请解释');const failure={role:'assistant',provider:'deepseek',model:'deepseek-flash',timestamp:80,content:[],usage:{input:0,output:0,cacheRead:0,cacheWrite:0},stopReason:'error'};await h.handlers.message_end({message:failure},h.ctx);await h.handlers.agent_end?.({messages:[failure]},h.ctx);const success={...failure,timestamp:81,stopReason:'stop',usage:{input:100,output:20,cacheRead:0,cacheWrite:0}};await h.handlers.message_end({message:success},h.ctx);expect(h.app.budget.snapshot().spentCny).toBe('0.00036');});
 it.each(['A','n','解释一下','shortcut','image','undo'])('external movement refreshes instead of applying stale input: %s',async text=>{const h=await setup();await h.command();const id=h.app.getSetting('activeSession')!,old=(await h.app.study.inspect(id)).question!;const action={origin:'cli' as const,eventId:'external'};await h.app.study.skip(id,action,old.presentationId);const next=(await h.app.study.next(id))!;
  if(text==='undo')await h.app.study.submit({sessionId:id,presentationId:next.presentationId,questionRevisionId:next.questionRevisionId,answer:['A'],confidence:'sure',idempotencyKey:'external-answer'},action);
- if(text==='shortcut'||text==='image')await h.pi.registerShortcut.mock.calls.find((x:any)=>x[0]===(text==='image'?'ctrl+alt+o':'ctrl+alt+n'))[1].handler(h.ctx);else if(text==='undo')await h.command('undo');else expect(await h.input(text)).toEqual({action:'handled'});
+ if(text==='shortcut')await h.pi.registerShortcut.mock.calls.find((x:any)=>x[0]==='ctrl+n')[1].handler(h.ctx);else if(text==='image')await h.input('图');else if(text==='undo')await h.command('undo');else expect(await h.input(text)).toEqual({action:'handled'});
  const s=await h.app.study.inspect(id);expect(s.question?.presentationId).toBe(next.presentationId);expect(s.assisted).toBe(false);expect(s.status).toBe(text==='undo'?'submitted':'open');expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions WHERE voided_at IS NULL').get()?.n).toBe(text==='undo'?1:0);expect(h.cards.some(c=>c.content.includes('第 2 题'))).toBe(true);expect(h.cards.at(-1).content).toContain('重新输入');
 });
 
@@ -32,4 +32,13 @@ it('one below-editor widget holds scores, thinking and rounded cost without a se
  expect(h.ctx.ui.setStatus.mock.calls.every((c:any)=>c[1]===undefined)).toBe(true);
  await h.input('n');await h.input('B');await h.command('think');expect(h.ctx.ui.setWidget.mock.calls.at(-1)[1][0]).toMatch(/^思考 · .*本轮 对 1 · 错 1/);
  await h.command('undo');expect(h.ctx.ui.setWidget.mock.calls.at(-1)[1][0]).toContain('本轮 对 1 · 错 0');
+});
+
+it('Ctrl+N advances, while 图 without images neither submits nor asks the model',async()=>{
+ const h=await setup();await h.command();
+ expect(await h.input('图')).toEqual({action:'handled'});expect(h.cards.at(-1).content).toContain('没有题图');
+ expect((await h.app.study.inspect(h.app.getSetting('activeSession')!)).assisted).toBe(false);
+ expect(h.pi.registerShortcut.mock.calls.map((c:any)=>c[0])).toEqual(['ctrl+n']);
+ await h.pi.registerShortcut.mock.calls[0][1].handler(h.ctx);expect(h.cards.at(-1).content).toContain('第 2 题');
+ expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
 });
