@@ -1,3 +1,4 @@
+import { describeIssues } from '../presentation/issues.js';
 import { formatMoney } from '../presentation/money.js';
 import { readFileSync } from 'node:fs';
 import { validateRates } from '../budget/ledger.js';
@@ -248,5 +249,5 @@ export function renderCli(result: any): string {
         return '本轮已完成；study start 开新一轮。';
     if (typeof result?.spentCny === 'string' && typeof result?.limitCny === 'string')
         return `本月已用 ${formatMoney(result.spentCny)} / ${formatMoney(result.limitCny)} 元`;
-    return JSON.stringify(result, null, 2);
+    return JSON.stringify(result, (key, value) => key === 'issues' && Array.isArray(value) ? describeIssues(value).descriptions : value, 2);
 }

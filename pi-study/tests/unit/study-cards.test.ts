@@ -37,3 +37,7 @@ it('combines answer-affecting warnings and gives a concrete unscored reason',()=
  const after=resultCard(q,['A'],{answer:[],explanation:'',issues:['missing_figure','duplicate_option_labels'],grade:{status:'unscorable'}} as any,budget);
  expect(after).toContain('— 不计分（原题缺图；原题选项编号重复）');
 });
+it('standalone CLI feedback also translates issues without mutating JSON data',async()=>{
+ const {renderCli}=await import('../../src/cli/commands.js');const f={answer:['B'],explanation:'解析',issues:['ocr_text_unverified','source_explanation_disputed','future_issue']};
+ const text=renderCli(f);expect(text).not.toMatch(/ocr_text_unverified|source_explanation_disputed|future_issue/);expect(text).toContain('这段解析可能有误');expect(f.issues[0]).toBe('ocr_text_unverified');
+});
