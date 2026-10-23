@@ -1,0 +1,11 @@
+{
+  "id": "network-authoritative-v1",
+  "version": "1",
+  "allowedDomains": [
+    "support.huawei.com",
+    "info.support.huawei.com",
+    "e.huawei.com",
+    "rfc-editor.org",
+    "datatracker.ietf.org"
+  ]
+}

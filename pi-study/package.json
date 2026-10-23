@@ -1,0 +1,58 @@
+{
+  "name": "pi-study",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "本地题库学习、参考判分与受控资料查证",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "study": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/adapters/pi/index.js"
+    ]
+  },
+  "files": [
+    "dist",
+    "converters",
+    "native/*.m",
+    "native/*.swift",
+    "native/build.sh",
+    "schema",
+    "examples",
+    "README.md",
+    "docs"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "convert:first": "node converters/first-docx.mjs",
+    "convert:province": "node converters/province-docx.mjs",
+    "convert:pdf": "node converters/pdf.mjs"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.87.1",
+    "@earendil-works/pi-ai": "^0.87.1"
+  },
+  "dependencies": {
+    "adm-zip": "0.5.16",
+    "fast-xml-parser": "5.3.8",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.87.1",
+    "@earendil-works/pi-coding-agent": "^0.87.1",
+    "@types/adm-zip": "0.5.7",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

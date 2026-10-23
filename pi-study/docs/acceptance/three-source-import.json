@@ -1,0 +1,71 @@
+{
+  "at": "2026-10-23T12:30:28.543Z",
+  "bankId": "67d02a0a-2330-4c96-86f3-defdbc50bbf1",
+  "dataDir": "/Users/arvinhan/Library/Application Support/pi-study/spaces/mvp-2026-10-23",
+  "imports": [
+    {
+      "bankId": "67d02a0a-2330-4c96-86f3-defdbc50bbf1",
+      "sourceId": "first-docx",
+      "imported": 1508,
+      "duplicates": 0,
+      "review": 4,
+      "sourceHash": "f2227c1066b06594ddfec506d4fd15b4d8374e5fd19761e2942e5adb98894ffd",
+      "ready": 1504,
+      "gaps": [],
+      "paragraphs": 9048,
+      "questionImages": 0,
+      "mappedCount": 1508
+    },
+    {
+      "bankId": "67d02a0a-2330-4c96-86f3-defdbc50bbf1",
+      "sourceId": "province-docx",
+      "imported": 109,
+      "duplicates": 0,
+      "review": 3,
+      "sourceHash": "c1aadf373b6c542a355827d148ac01bb39edddfbc900a930ecfff38cd8f0cda3",
+      "ready": 106,
+      "gaps": [],
+      "paragraphs": 1310,
+      "questionImages": 2,
+      "mappedCount": 109
+    },
+    {
+      "bankId": "67d02a0a-2330-4c96-86f3-defdbc50bbf1",
+      "sourceId": "wlan-pdf",
+      "imported": 979,
+      "duplicates": 0,
+      "review": 8,
+      "sourceHash": "361f96a5c8d7fdc5dbe87cb0a59c3e094eb443c8df9a92a50d705ada807e0740",
+      "ready": 971,
+      "gaps": [],
+      "pages": 235,
+      "questionImages": 198,
+      "mappedCount": 979
+    }
+  ],
+  "total": 2596,
+  "duplicate": {
+    "bankId": "67d02a0a-2330-4c96-86f3-defdbc50bbf1",
+    "sourceId": "wlan-pdf",
+    "imported": 0,
+    "duplicates": 979,
+    "review": 8
+  },
+  "backup": "/Users/arvinhan/Documents/华为ict训练/backups/pi-study-mvp-2026-10-23.zip",
+  "backupFiles": 441,
+  "backupUnpackedBytes": 124263890,
+  "restored": "/var/folders/z9/njtwfkzj1jb_7vg577dvyw940000gn/T/pi-study-acceptance-bCGbRb/restored",
+  "restoredCount": 2596,
+  "financeUnchanged": true,
+  "finance": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "20206000",
+    "occupiedNano": "0",
+    "remainingNano": "9979794000",
+    "warning80Percent": false
+  },
+  "defaultSpaceSelected": true,
+  "submissions": 0
+}

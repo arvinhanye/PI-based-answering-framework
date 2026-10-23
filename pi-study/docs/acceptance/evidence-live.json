@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-23T12:09:04.445Z",
+  "realCall": true,
+  "id": "bf55ad9d-1553-4f2e-95c2-f8afe7652cf5",
+  "state": "complete",
+  "sources": [
+    {
+      "url": "https://support.huawei.com/enterprise/zh/doc/EDOC1100317287/e5ae3080#1",
+      "title": "对不起，您访问的内容到期已下架",
+      "hash": "7f5dd2492fe5bc4eba6bf198386fdba8caeec57fa3dd21a83673feb74da84714",
+      "characters": 291
+    }
+  ],
+  "before": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "206000",
+    "occupiedNano": "0",
+    "remainingNano": "9999794000",
+    "warning80Percent": false
+  },
+  "after": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "10206000",
+    "occupiedNano": "0",
+    "remainingNano": "9989794000",
+    "warning80Percent": false
+  }
+}

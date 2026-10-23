@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-23T12:07:39.181Z",
+  "realCall": true,
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "requestId": "a2f39586-2d86-4c27-b15e-56be848c5036",
+  "state": "settled",
+  "estimatedCostNano": "206000",
+  "text": "OSPF邻居指两台路由器通过Hello报文发现并互认为可达的直连关系。",
+  "before": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "0",
+    "occupiedNano": "0",
+    "remainingNano": "10000000000",
+    "warning80Percent": false
+  },
+  "after": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "206000",
+    "occupiedNano": "0",
+    "remainingNano": "9999794000",
+    "warning80Percent": false
+  }
+}

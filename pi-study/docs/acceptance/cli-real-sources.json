@@ -1,0 +1,87 @@
+{
+  "at": "2026-10-23T12:34:26.882Z",
+  "dataDir": "/var/folders/z9/njtwfkzj1jb_7vg577dvyw940000gn/T/pi-study-acceptance-bCGbRb/restored",
+  "scratchOnly": true,
+  "cases": [
+    {
+      "sourceId": "first-docx",
+      "sourceKey": "1",
+      "kind": "single",
+      "grade": {
+        "maxScore": 1,
+        "basisStatus": "source_only",
+        "status": "scored",
+        "score": 1,
+        "correct": true,
+        "reason": "依据来源答案的参考判分"
+      },
+      "feedbackAvailable": true,
+      "crossProcessResume": true,
+      "answerHiddenBeforeSubmit": true
+    },
+    {
+      "sourceId": "province-docx",
+      "sourceKey": "p1",
+      "kind": "single",
+      "grade": {
+        "maxScore": 1,
+        "basisStatus": "source_only",
+        "status": "scored",
+        "score": 1,
+        "correct": true,
+        "reason": "依据来源答案的参考判分"
+      },
+      "feedbackAvailable": true,
+      "crossProcessResume": true,
+      "answerHiddenBeforeSubmit": true
+    },
+    {
+      "sourceId": "wlan-pdf",
+      "sourceKey": "p1-q1",
+      "kind": "truefalse",
+      "grade": {
+        "maxScore": 1,
+        "basisStatus": "source_only",
+        "status": "scored",
+        "score": 1,
+        "correct": true,
+        "reason": "依据来源答案的参考判分"
+      },
+      "feedbackAvailable": true,
+      "crossProcessResume": true,
+      "answerHiddenBeforeSubmit": true
+    }
+  ],
+  "stats": {
+    "label": "参考成绩",
+    "totalQuestions": 2596,
+    "covered": 3,
+    "wrong": 0,
+    "due": 0,
+    "current": {
+      "independent": {
+        "numerator": 3,
+        "denominator": 3
+      },
+      "assisted": {
+        "numerator": 0,
+        "denominator": 0
+      }
+    },
+    "historical": {
+      "numerator": 3,
+      "denominator": 3
+    },
+    "excluded": 0,
+    "attempts": 3,
+    "exclusionRule": "未答、跳过、作废、不可评分和争议不进分母；独立与辅助分别取最新可评分记录"
+  },
+  "imageQuestion": {
+    "sourceId": "wlan-pdf",
+    "sourceKey": "p1-q3",
+    "presentationId": "f44335f3-8803-40a3-b699-dec46891d1cf",
+    "assets": [
+      "/var/folders/z9/njtwfkzj1jb_7vg577dvyw940000gn/T/pi-study-acceptance-bCGbRb/restored/assets/b94fc8ce023d6d3f4dd96549a9fbcafeaf7bd61a8858c6d22a1edc8e3a1ef0b1.png"
+    ]
+  }
+}

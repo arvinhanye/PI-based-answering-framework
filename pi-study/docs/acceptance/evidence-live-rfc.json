@@ -1,0 +1,35 @@
+{
+  "at": "2026-10-23T12:20:33.873Z",
+  "realCall": true,
+  "id": "18c83761-c1c8-4944-be9e-a625e3037008",
+  "state": "complete",
+  "qualityNotice": "仅完成网页获取；域名符合来源策略不代表内容权威、相关或足以支撑结论，需核对原文。",
+  "sources": [
+    {
+      "url": "https://www.rfc-editor.org/errata/eid5041",
+      "title": "Erratum 5041",
+      "hash": "3aad370dd3a56b44ef4d0736f83d6d8efb71391e5132c4ff1575c4493f5ec867",
+      "characters": 1649,
+      "containsNeighbor": true,
+      "containsOSPF": true
+    }
+  ],
+  "before": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "10206000",
+    "occupiedNano": "0",
+    "remainingNano": "9989794000",
+    "warning80Percent": false
+  },
+  "after": {
+    "period": "2026-10",
+    "limitCny": "10",
+    "limitNano": "10000000000",
+    "spentNano": "20206000",
+    "occupiedNano": "0",
+    "remainingNano": "9979794000",
+    "warning80Percent": false
+  }
+}

@@ -1,0 +1,10 @@
+import { test, expect } from 'vitest';
+import type { QuestionBankInput } from '../../src/contracts.js';
+import { validateQuestionBank } from '../../src/import/validation.js';
+const input=():QuestionBankInput=>({schemaVersion:1,source:{id:'demo',name:'人工样本',sha256:'a'.repeat(64)},questions:[{sourceKey:'1',kind:'single',stem:'选择 A',options:[{id:'A',text:'甲'},{id:'B',text:'乙'}],answer:['A'],rawAnswer:'A',explanation:'人工样本',topics:[],status:'ready',basisStatus:'source_only',issues:[],locations:[{paragraph:1}],assets:[]}],report:{candidateCount:1,ready:1,needsReview:0,gaps:[]}});
+test('valid reusable bank preserves raw answer and provenance',()=>expect(validateQuestionBank(input()).questions[0]?.rawAnswer).toBe('A'));
+test('invalid option-answer cannot be imported ready',()=>{const v=input();v.questions[0]!.answer=['C'];expect(()=>validateQuestionBank(v)).toThrow(/答案/);});
+test('duplicate source keys and mismatched candidate reports reject silent data loss',()=>{const v=input();v.questions.push(v.questions[0]!);expect(()=>validateQuestionBank(v)).toThrow(/重复|数量/);});
+test('unscorable candidates lacking original answers remain importable',()=>{const v=input();v.questions[0]!.answer=[];v.questions[0]!.status='needs_review';v.questions[0]!.basisStatus='insufficient';v.questions[0]!.issues=['原件答案不可见'];v.report.ready=0;v.report.needsReview=1;expect(validateQuestionBank(v).questions).toHaveLength(1);});
+test('PDF coverage gaps cannot be hidden behind success report',()=>{const v:any=input();v.source.pageCount=235;v.source.processing=[];expect(()=>validateQuestionBank(v)).toThrow(/页/);});
+test('source duplicate option labels can be preserved as explicit unscorable review candidate',()=>{const v=input();v.questions[0]!.options[1]!.id='A';v.questions[0]!.status='needs_review';v.questions[0]!.issues=['原资料选项编号重复'];v.report.ready=0;v.report.needsReview=1;expect(validateQuestionBank(v).questions[0]!.options).toHaveLength(2);});

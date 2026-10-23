@@ -1,0 +1,41 @@
+# Local materials and derived question banks
+*.docx
+*.pdf
+converted/
+local-data/
+
+# Dependencies, builds and native helper executables
+node_modules/
+dist/
+coverage/
+*.tgz
+/pi-study/native/crop
+/pi-study/native/ocr-local
+/pi-study/native/ocr-fast
+/pi-study/native/render
+/pi-study/native/make-fixture
+
+# Personal runtime, credentials and generated outputs
+.env
+.env.*
+!.env.example
+*.sqlite*
+*.db
+*.db-*
+*.pem
+*.key
+*.p12
+*.pfx
+.pi/
+.superpowers/
+logs/
+*.log
+probe-output/
+probe-outputs/
+**/probes/output/
+**/probes/outputs/
+artifacts/
+backups/
+.DS_Store
+*.tmp
+*.bak
