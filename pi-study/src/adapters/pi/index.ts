@@ -1,6 +1,6 @@
 import { formatMoney } from '../../presentation/money.js';
 import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
-import { Text } from '@earendil-works/pi-tui';
+import { createStudyRenderer } from './renderer.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -54,7 +54,7 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             details = { boundary };
         }
         const source = (await app.banks.listSources(s.session.bankId)).find(x => x.id === q.sourceId);
-        send(questionCard(q, s.progress, app.budget.snapshot(), ['first-docx', 'province-docx', 'wlan-pdf', 'pdf'].includes(q.sourceId) ? sourceLabel(q.sourceId) : source?.name), details);
+        send(questionCard(q, s.progress, app.budget.snapshot(), ['first-docx', 'province-docx', 'wlan-pdf', 'pdf'].includes(q.sourceId) ? sourceLabel(q.sourceId) : source?.name), { ...details, images: q.assets });
         if (s.status === 'submitted')
             send(resultCard(q, s.answer, await app.study.feedback(q.presentationId), app.budget.snapshot()));
         await status(ctx);
@@ -156,7 +156,7 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             busy = false;
         }
     };
-    pi.registerMessageRenderer('study-card', (message, options) => new Text(String(message.content), options.outputPad, 1));
+    pi.registerMessageRenderer('study-card', createStudyRenderer(app.dataDir));
     pi.registerCommand('study', { description: '刷题；menu 设置 / undo 撤销 / think 思考 / budget 金额 / exit 退出', handler: async (args, ctx) => guarded(ctx, async () => {
             const text = args.trim();
             if (text === 'exit') {
@@ -251,9 +251,10 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
                     return;
                 }
                 const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? undefined : 'xdg-open';
-                if (command) await promisify(execFile)(command, [images[0]!.path]);
-                else send(images[0]!.path);
-                if (images.length > 1) send(`共有 ${images.length} 张题图，已打开第一张。\n${images.map(x => x.path).join('\n')}`);
+                if (command) {
+                    if (process.platform === 'darwin') await promisify(execFile)(command, images.map(image => image.path));
+                    else for (const image of images) await promisify(execFile)(command, [image.path]);
+                } else send(images.map(image => image.path).join('\n'));
                 return;
             }
             if (parsed.type === 'invalid') {

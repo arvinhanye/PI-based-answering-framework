@@ -1,9 +1,9 @@
-import {it,expect,afterEach,vi} from 'vitest';import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {it,expect,afterEach,vi} from 'vitest';import {mkdtempSync,rmSync,mkdirSync,writeFileSync,readFileSync,realpathSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';
 import {createApp} from '../../src/composition.js';import {registerStudy} from '../../src/adapters/pi/index.js';
 const clean:Array<()=>void>=[];afterEach(()=>clean.splice(0).forEach(f=>f()));
-async function setup(hasKey=true){
+async function setup(hasKey=true, assets:any[]=[]){
  const home=mkdtempSync(join(tmpdir(),'pi-ux-')),app=createApp({home});clean.push(()=>{app.close();rmSync(home,{recursive:true,force:true});});const bank=await app.banks.create('演示题库');
- await app.banks.importBank({schemaVersion:1,source:{id:'first-docx',name:'1500题',sha256:'fixture'},questions:[1,2].map(n=>({sourceKey:String(n),kind:'single' as const,stem:'题干'+n,options:[{id:'A',text:'甲'},{id:'B',text:'乙'}],answer:['A'],rawAnswer:'A',explanation:'原解析'+n,topics:[],status:'ready' as const,basisStatus:'source_only' as const,issues:[],locations:[],assets:[]})),report:{candidateCount:2,ready:2,needsReview:0,gaps:[]}},bank.id);
+ await app.banks.importBank({schemaVersion:1,source:{id:'first-docx',name:'1500题',sha256:'fixture'},questions:[1,2].map(n=>({sourceKey:String(n),kind:'single' as const,stem:'题干'+n,options:[{id:'A',text:'甲'},{id:'B',text:'乙'}],answer:['A'],rawAnswer:'A',explanation:'原解析'+n,topics:[],status:'ready' as const,basisStatus:'source_only' as const,issues:[],locations:[],assets})),report:{candidateCount:2,ready:2,needsReview:0,gaps:[]}},bank.id);
  const handlers:Record<string,any>={},commands:Record<string,any>={},cards:any[]=[],tools=['read','bash'];let activeTools=tools,thinking='high';
  const original={provider:'other',id:'original'},flash={provider:'deepseek',id:'deepseek-flash'};
  const pi:any={on:(n:string,h:any)=>{handlers[n]=h;},registerCommand:(n:string,c:any)=>{commands[n]=c;},registerMessageRenderer:vi.fn(),registerShortcut:vi.fn(),sendMessage:(m:any)=>cards.push({role:'custom',...m}),getActiveTools:()=>activeTools,setActiveTools:(t:string[])=>{activeTools=t;},getThinkingLevel:()=>thinking,setThinkingLevel:(v:string)=>{thinking=v;},setModel:vi.fn(async()=>true),registerTool:vi.fn(),registerProvider:vi.fn()};
@@ -41,4 +41,18 @@ it('Ctrl+N advances, while 图 without images neither submits nor asks the model
  expect(h.pi.registerShortcut.mock.calls.map((c:any)=>c[0])).toEqual(['ctrl+n']);
  await h.pi.registerShortcut.mock.calls[0][1].handler(h.ctx);expect(h.cards.at(-1).content).toContain('第 2 题');
  expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
+});
+
+it('question image metadata stays out of content, and 图 opens all safe paths without grading',async()=>{
+ const assets=[1,2].map(n=>({role:'question',mime:'image/png',path:`assets/题 图${n}.png`,sha256:'fixture'}));
+ const h=await setup(true,assets);mkdirSync(join(h.app.dataDir,'assets'),{recursive:true});for(const a of assets)writeFileSync(join(h.app.dataDir,a.path),'fixture');
+ const bin=join(h.app.home,'bin'),log=join(h.app.home,'opened.json');mkdirSync(bin);
+ const executable=process.platform==='darwin'?'open':'xdg-open';
+ writeFileSync(join(bin,executable),`#!${process.execPath}\nrequire('node:fs').appendFileSync(process.env.STUDY_OPEN_LOG,JSON.stringify(process.argv.slice(2))+'\\n');\n`,{mode:0o700});
+ const oldPath=process.env.PATH;process.env.PATH=bin+':'+oldPath;process.env.STUDY_OPEN_LOG=log;
+ try{
+ await h.command();expect(h.cards.at(-1).details.images).toEqual(assets);expect(h.cards.at(-1).content).not.toContain('assets/');
+ expect(await h.input('图')).toEqual({action:'handled'});const opened=readFileSync(log,'utf8').trim().split('\n').flatMap(s=>JSON.parse(s));expect(opened).toEqual(assets.map(a=>realpathSync(join(h.app.dataDir,a.path))));
+ expect((await h.app.study.inspect(h.app.getSetting('activeSession')!)).assisted).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
+ }finally{process.env.PATH=oldPath;delete process.env.STUDY_OPEN_LOG;}
 });
