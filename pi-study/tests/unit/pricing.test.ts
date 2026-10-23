@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { PriceService } from '../../src/budget/pricing.js';
 import { reviewedDeepSeekProfiles } from '../../src/budget/profiles.js';
 const request = {
@@ -10,7 +10,7 @@ const request = {
             }]
     }
 };
-it('reviewed_restricted_profile_has_conservative_fullcontext_bound', () => { const r = reviewedDeepSeekProfiles().generation; expect(new PriceService(() => Date.parse('2026-10-23T12:00:00Z')).upperBound(request, r).amountNano).toBe('2105344000'); });
+it('reviewed_restricted_profile_has_conservative_fullcontext_bound', () => { const r = reviewedDeepSeekProfiles().generation; expect(new PriceService().upperBound(request, r).amountNano).toBe('2105344000'); });
 it('restricted_profile_rejects_thinking_tools_and_images', () => {
     const r = reviewedDeepSeekProfiles().generation;
     for (const payload of [{
@@ -28,8 +28,8 @@ it('restricted_profile_rejects_thinking_tools_and_images', () => {
                         }]
                 }]
         }])
-        expect(() => new PriceService(() => Date.parse('2026-10-23T12:00:00Z')).upperBound({
+        expect(() => new PriceService().upperBound({
             ...request, payload
         }, r)).toThrow(/restricted|text|thinking/);
 });
-it('reviewed_profile_expires_under_local_policy', () => expect(() => new PriceService(() => Date.parse('2026-10-25T00:00:00Z')).upperBound(request, reviewedDeepSeekProfiles().generation)).toThrow(/expired/));
+it('production rates still admit generation after the former expiry', () => { vi.useFakeTimers({toFake:['Date']}); vi.setSystemTime(new Date('2026-10-26T00:00:00Z')); try { expect(new PriceService().upperBound(request, reviewedDeepSeekProfiles().generation).amountNano).toBe('2105344000'); } finally { vi.useRealTimers(); } });

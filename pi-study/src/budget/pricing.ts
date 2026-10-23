@@ -1,11 +1,9 @@
 export interface RateCard {
     restriction?: 'deepseek-text-nonthinking-v1';
-    checkedAt?: string;
     cacheHitNanoPerMillion?: string;
     operation?: 'generation' | 'search' | 'fetch';
     version: string;
     verified: boolean;
-    validUntil: string;
     sourceUrls: string[];
     model: string;
     contextTokens: number;
@@ -31,10 +29,9 @@ export interface CostUpperBound {
     proofVersion: string;
 }
 export class PriceService {
-    constructor(private now: () => number = Date.now) { }
     upperBound(i: PaidRequest, r: RateCard): CostUpperBound {
-        if (!r.verified || !r.version || !r.sourceUrls.length || !Number.isFinite(Date.parse(r.validUntil)) || Date.parse(r.validUntil) <= this.now())
-            throw new Error('unverified or expired pricing');
+        if (!r.verified || !r.version || !r.sourceUrls.length)
+            throw new Error('unverified pricing');
         if (r.operation === 'search' || r.operation === 'fetch') {
             if (i.endpoint !== 'https://api.deepseek.com/v1/tools/' + r.operation || !r.fixedNano || BigInt(r.fixedNano) <= 0n)
                 throw new Error('fixed tool rate mismatch');

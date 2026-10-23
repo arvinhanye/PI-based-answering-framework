@@ -4,15 +4,6 @@ export type RateProfiles = ReturnType<typeof reviewedDeepSeekProfiles>;
 function record(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-function timestamp(value: unknown): number {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value))
-        throw new Error('核查时间及有效期必须是明确的 UTC ISO 时间');
-    const parsed = Date.parse(value);
-    const canonical = value.includes('.') ? value : value.replace('Z', '.000Z');
-    if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== canonical)
-        throw new Error('核查时间或有效期无效');
-    return parsed;
-}
 function amount(value: unknown, minimum: bigint): bigint {
     if (typeof value !== 'string' || !/^(?:0|[1-9]\d{0,39})$/.test(value))
         throw new Error('费率必须是规范的非负整数纳元字符串');
@@ -47,9 +38,6 @@ export function validateProfiles(value: unknown): RateProfiles {
     if (!record(value))
         throw new Error('费率文件格式无效');
     const baseline = reviewedDeepSeekProfiles();
-    const now = Date.now();
-    if (!Number.isFinite(now))
-        throw new Error('当前时间无效，拒绝费率准入');
     for (const operation of ['generation', 'search', 'fetch'] as const) {
         const raw = value[operation];
         if (!record(raw))
@@ -59,9 +47,6 @@ export function validateProfiles(value: unknown): RateProfiles {
             throw new Error('需要明确且已核查的 DeepSeek 费率证明');
         if (!Number.isSafeInteger(card.contextTokens) || card.contextTokens < 1048576)
             throw new Error('上下文上界必须是不少于 1048576 的安全整数');
-        const checkedAt = timestamp(card.checkedAt), validUntil = timestamp(card.validUntil);
-        if (checkedAt > now || validUntil <= checkedAt || validUntil <= now || validUntil - checkedAt > 86400000)
-            throw new Error('费率已过期或核查时间/24小时有效期无效');
         const urls = officialSources(card.sourceUrls);
         const inputRate = amount(card.inputNanoPerMillion, BigInt(baseline[operation].inputNanoPerMillion));
         amount(card.outputNanoPerMillion, BigInt(baseline[operation].outputNanoPerMillion));
@@ -92,7 +77,13 @@ export function validateProfiles(value: unknown): RateProfiles {
             } : {}, rate: card
         }, card);
     }
-    return structuredClone(value) as RateProfiles;
+    const result = structuredClone(value);
+    // Older saved profiles may still carry retired timing metadata; ignore it.
+    for (const operation of ['generation','search','fetch']) {
+        const card = result[operation] as Record<string, unknown>;
+        delete card.checkedAt; delete card.validUntil; delete card.policy;
+    }
+    return result as RateProfiles;
 }
 export function configuredProfiles(getSetting: (key: string) => string | undefined): RateProfiles {
     const raw = getSetting('reviewedRates');

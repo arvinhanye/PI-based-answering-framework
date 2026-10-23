@@ -22,11 +22,9 @@ export async function showConnectionStatus(app:StudyApp,ctx:ExtensionContext):Pr
  let pricing:string;
  try{
   const {generation}=configuredProfiles(app.getSetting);
-  const expires=generation.validUntil.replace('T',' ').replace(/(?:\.000)?Z$/,' UTC');
-  pricing=`受控讲解模型：${generation.model}。\n费率校验通过，有效至 ${expires}。`;
- }catch(error){
-  const expired=error instanceof Error&&error.message.includes('已过期');
-  pricing=`${expired?'费率已过期或核查时间无效':'费率配置无效'}，受控 AI 暂不可用；核查官方价格并更新费率后可重试，本地刷题仍可继续。`;
+  pricing=`受控讲解模型：${generation.model}。\n费率配置可用；价格变动时手动更新费率数字。`;
+ }catch{
+  pricing=`费率配置无效，受控 AI 暂不可用；核查官方价格并更新费率后可重试，本地刷题仍可继续。`;
  }
  ctx.ui.notify([
   '学习态宿主：local-quick（本地离线）。底栏模型名不表示 DeepSeek 的连接状态。',

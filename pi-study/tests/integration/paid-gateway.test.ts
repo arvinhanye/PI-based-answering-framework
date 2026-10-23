@@ -6,7 +6,7 @@ import { BudgetService } from '../../src/budget/service.js';
 import { PaidGateway } from '../../src/budget/gateway.js';
 import { PriceService } from '../../src/budget/pricing.js';
 const rate = {
-    version: 'fixture-v1', verified: true, validUntil: '2099-01-01', sourceUrls: ['https://example.test/proof'], model: 'deepseek-flash', contextTokens: 1000000, inputNanoPerMillion: '2000000000', outputNanoPerMillion: '8000000000', hardOutputIncludesReasoning: true
+    version: 'fixture-v1', verified: true, sourceUrls: ['https://example.test/proof'], model: 'deepseek-flash', contextTokens: 1000000, inputNanoPerMillion: '2000000000', outputNanoPerMillion: '8000000000', hardOutputIncludesReasoning: true
 };
 const req = (id = 'a') => ({
     requestId: id, endpoint: 'https://api.deepseek.com/chat/completions', payload: {
@@ -24,9 +24,6 @@ it('no_proven_bound_rejected', () => expect(() => new PriceService().upperBound(
 })).toThrow());
 it('reasoning_requires_hard_output_cap', () => expect(() => new PriceService().upperBound(req(), {
     ...rate, hardOutputIncludesReasoning: false
-})).toThrow());
-it('expired_rate_rejected', () => expect(() => new PriceService().upperBound(req(), {
-    ...rate, validUntil: '2020-01-01'
 })).toThrow());
 it('validated_tokenizer_requires_version', () => expect(() => new PriceService().upperBound(req(), {
     ...rate, strategy: 'validated-tokenizer'

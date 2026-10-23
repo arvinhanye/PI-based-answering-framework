@@ -1,5 +1,6 @@
 # Provider 边界调查（2026-10-23）
 
+> 后续变更（2026-10-23）：本地 24 小时费率过期机制已按用户要求删除；下文涉及有效期/过期拒绝的内容为原实现验收记录，不再代表当前行为。
 实测安装：`/usr/local/lib/node_modules/@earendil-works/pi-coding-agent`，0.87.1。`probes/provider.ts` 使用安装包的真实 OpenAI completions adapter、假 key、拒绝发送的注入 fetch；不读取任何凭证、不发送网络。
 
 | 路径 | 最终准入与重试 | 结论 |

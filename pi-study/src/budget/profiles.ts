@@ -1,15 +1,11 @@
 import type { RateCard } from './pricing.js';
-/** Review TTL is local risk policy, not a promise by DeepSeek that prices cannot change. */
-export const DEEPSEEK_REVIEW = {
-    checkedAt: '2026-10-23T11:49:47.000Z', validUntil: '2026-10-24T11:49:47.000Z', policy: 'local-review-ttl-24h-v1'
-} as const;
 export function reviewedDeepSeekProfiles(): {
     generation: RateCard;
     search: RateCard;
     fetch: RateCard;
 } {
     const common: RateCard = {
-        version: 'deepseek-cn-2026-10-23-text-v1', verified: true, ...DEEPSEEK_REVIEW, sourceUrls: ['https://api-docs.deepseek.com/zh-cn/quick_start/pricing/', 'https://api-docs.deepseek.com/api/create-chat-completion/', 'https://api-docs.deepseek.com/guides/thinking_mode/'], model: 'deepseek-flash', contextTokens: 1048576, inputNanoPerMillion: '2000000000', outputNanoPerMillion: '8000000000', cacheHitNanoPerMillion: '40000000', hardOutputIncludesReasoning: true
+        version: 'deepseek-cn-2026-10-23-text-v1', verified: true, sourceUrls: ['https://api-docs.deepseek.com/zh-cn/quick_start/pricing/', 'https://api-docs.deepseek.com/api/create-chat-completion/', 'https://api-docs.deepseek.com/guides/thinking_mode/'], model: 'deepseek-flash', contextTokens: 1048576, inputNanoPerMillion: '2000000000', outputNanoPerMillion: '8000000000', cacheHitNanoPerMillion: '40000000', hardOutputIncludesReasoning: true
     };
     return {
         generation: {

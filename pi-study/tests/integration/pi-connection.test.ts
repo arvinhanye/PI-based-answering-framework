@@ -14,7 +14,7 @@ function setup(resolveKey:()=>Promise<string|undefined>=async()=> 'nonsecret-tes
  const app=createApp({home:dir,dataDir:join(dir,'data')});
  cleanup.push(()=>{app.close();rmSync(dir,{recursive:true,force:true});});
  const profiles=reviewedDeepSeekProfiles();
- for(const profile of Object.values(profiles)){profile.checkedAt='2026-10-23T00:00:00.000Z';profile.validUntil='2026-10-24T00:00:00.000Z';}
+ for(const profile of Object.values(profiles)){Object.assign(profile,{checkedAt:'2026-10-23T00:00:00.000Z',validUntil:'2026-10-24T00:00:00.000Z',policy:'local-review-ttl-24h-v1'});}
  app.setSetting('reviewedRates',JSON.stringify(profiles));
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-23T12:00:00.000Z'));
  const messages:string[]=[],providers:string[]=[];
@@ -26,7 +26,7 @@ function setup(resolveKey:()=>Promise<string|undefined>=async()=> 'nonsecret-tes
 it('reports configured credentials and real stored rate validity without claiming a live connection or charging',async()=>{
  const h=setup();await showConnectionStatus(h.app,h.ctx);const text=h.messages.join('\n');
  expect(h.providers).toEqual(['deepseek']);expect(text).toContain('local-quick');expect(text).toContain('已配置');
- expect(text).toContain('deepseek-flash');expect(text).toContain('2026-10-24');expect(text).toContain('未进行实时连接测试');
+ expect(text).toContain('deepseek-flash');expect(text).not.toContain('有效至');expect(text).toContain('未进行实时连接测试');
  expect(text).toContain('提交');expect(text).toContain('揭晓');expect(text).toContain('确认');expect(text).not.toContain('已连接');
  expect(text).not.toContain('nonsecret-test-key');expect(h.network).not.toHaveBeenCalled();expect(existsSync(h.app.financePath)).toBe(false);
 });
@@ -40,9 +40,9 @@ it('sanitizes credential resolution failures without misreporting a provider con
  expect(text).toContain('读取失败');expect(text).not.toContain('PRIVATE_TEST_SECRET');expect(text).not.toContain('auth command');expect(text).not.toContain('已连接');
  expect(h.network).not.toHaveBeenCalled();
 });
-it('uses real profile validation to report expired pricing while keeping local learning available',async()=>{
- const h=setup();vi.setSystemTime(new Date('2026-10-24T00:00:00.000Z'));await showConnectionStatus(h.app,h.ctx);const text=h.messages.join('\n');
- expect(text).toContain('费率已过期');expect(text).toContain('暂不可用');expect(text).toContain('本地刷题');
+it('stored legacy rates remain ready beyond the former deadline',async()=>{
+ const h=setup();vi.setSystemTime(new Date('2026-10-26T00:00:00.000Z'));await showConnectionStatus(h.app,h.ctx);const text=h.messages.join('\n');
+ expect(text).not.toContain('过期');expect(text).not.toContain('暂不可用');expect(text).toContain('deepseek-flash');
  expect(h.network).not.toHaveBeenCalled();expect(existsSync(h.app.financePath)).toBe(false);
 });
 it('does not echo malformed saved configuration as a usable rate or raw error',async()=>{

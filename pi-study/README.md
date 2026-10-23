@@ -67,9 +67,9 @@ node dist/cli/index.js verify 'OSPF 邻居建立 site:support.huawei.com'
 
 `explain/verify` 在提交或明确揭晓后开放。MVP 使用 `deepseek-flash`、纯文本、关闭 thinking、非流式、1024 输出 token 上限。一次生成按完整上下文保守预留约 2.106 元；收到用量后按峰值价格估计结算并释放差额，预留金额并非实扣。Search/Fetch 每次手动任务最多各一次。引用正文保存为证据，不自动改答案或分数。
 
-费率卡带核查时间和失效时间；24 小时有效期是本地复核政策，不是服务商不涨价承诺。过期、未知费用、未证明上界时停止新付费请求。超时/断流保留未知占额，不自动释放。具体证据、限制与真实联调记录见 `docs/verification/budget-pricing.md`、`docs/acceptance/`。当前不支持流式付费调用和云端批量 OCR。
+费率不设有效期，也不要求核查时间；价格变动时手动更新费率数字。未知费用、未证明上界时仍停止新付费请求。超时/断流保留未知占额，不自动释放。具体证据、限制与真实联调记录见 `docs/verification/budget-pricing.md`、`docs/acceptance/`。当前不支持流式付费调用和云端批量 OCR。
 
-每个题库的来源策略可独立设置。费率过期时先核查 DeepSeek 官方价格与计费规则，再编辑示例中的核查时间、有效期和金额，明确确认后导入。仅修改日期不能证明价格未变；输入费率低于当前已验证保守下界时会被拒绝。此限制只阻断付费调用，本地刷题不受影响。
+每个题库的来源策略可独立设置。费率改动时编辑示例中的金额，明确确认后导入。此阶段仍保留费率下界等校验，后续按交互改造规格切换软记账。此限制只阻断付费调用，本地刷题不受影响。
 
 ```sh
 node dist/cli/index.js source-policy show
@@ -78,7 +78,7 @@ node dist/cli/index.js pricing show
 node dist/cli/index.js pricing set '/路径/已核查费率.json' --yes
 ```
 
-`examples/reviewed-rates.example.json` 是 2026-10-23 的快照，不能作为长期有效报价。金额单位是十亿分之一元（nano CNY），每百万 token 单价与单次费用分开填写。CLI 和 Pi 使用同一当前业务空间配置，月预算账本则跨业务空间共享。
+`examples/reviewed-rates.example.json` 提供初始费率数字；供应商调价时由用户更新。金额单位是十亿分之一元（nano CNY），每百万 token 单价与单次费用分开填写。CLI 和 Pi 使用同一当前业务空间配置，月预算账本则跨业务空间共享。
 
 ## 数据与恢复
 

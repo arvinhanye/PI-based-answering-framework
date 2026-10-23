@@ -1,5 +1,6 @@
 # 财务预算故障验证
 
+> 后续变更（2026-10-23）：本地 24 小时费率过期机制已按用户要求删除；下文涉及有效期/过期拒绝的内容为原实现验收记录，不再代表当前行为。
 金额内部BigInt纳元，对外十进制string，默认10元/月。时区初始化存储，回拨直接冻结。跨月结算归原始预留周期。降额允许余额变负但不得新发请求。每次重试必须新requestId。
 
 财务库固定独立路径，由root compose决定；WAL、foreign_keys、busy_timeout=5000、synchronous=FULL。短事务BEGIN IMMEDIATE，无网络等待。reserve→dispatch在HTTP前持久化；有验证usage才保守按缓存未命中价结算，无usage/错误/断流/重定向维持unknown占额。已知空Search/Fetch结果才释放。已确认未发送可release；不得以“用户取消”推断免费。
