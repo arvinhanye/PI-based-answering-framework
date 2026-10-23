@@ -30,6 +30,8 @@ def command(text):
             pump(.4);return events()[before:]
     raise RuntimeError('No extension output for '+text)
 def card(rows):return [e['content'] for e in rows if e['type']=='card']
+def answer(sample):
+    return ''.join({'true':'对','false':'错'}.get(value,value) for value in sample['answer'])
 results={}
 try:
     pump(4)
@@ -42,9 +44,9 @@ try:
     q=card(command('n'))[0];assert '原题缺图，本题不计分' in q and q.count('⚠')==1
     r=card(command(samples[1]['answer'][0]))[0];assert '— 不计分（原题缺图）' in r
     results['4']={'passed':True,'question':q,'result':r}
-    command('/study 省赛');r=card(command(''.join(samples[2]['answer'])))[0];assert r.count('题库未提供解析')==1 and '⚠' not in r
+    command('/study 省赛');r=card(command(answer(samples[2])))[0];assert r.count('题库未提供解析')==1 and '⚠' not in r
     results['3']={'passed':True,'result':r}
-    command('/study pdf');r=card(command(''.join(samples[3]['answer'])))[0];assert 'ocr_text_unverified' not in r
+    command('/study pdf');r=card(command(answer(samples[3])))[0];assert '✓ 正确' in r and 'ocr_text_unverified' not in r
     results['2']={'passed':True,'result':r}
     command('n');rows=command('n');assert '第 p1-q3 题' in card(rows)[0] and any(e.get('images',0)>0 for e in rows)
     results['8_fallback']={'passed':True,'question':card(rows)[0],'note':'PTY text fallback only; no Warp pixels or Preview window checked'}

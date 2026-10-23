@@ -56,3 +56,11 @@ it('question image metadata stays out of content, and 图 opens all safe paths w
  expect((await h.app.study.inspect(h.app.getSetting('activeSession')!)).assisted).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
  }finally{process.env.PATH=oldPath;delete process.env.STUDY_OPEN_LOG;}
 });
+it('/study stats and menu grades share a readable card without starting or changing the learning session',async()=>{
+ const h=await setup();const before=h.app.getSetting('activeSession');
+ await h.command('stats');expect(h.cards.at(-1).content).toContain('进度');expect(h.cards.at(-1).content).toContain('已做 0 / 2');expect(h.app.getSetting('activeSession')).toBe(before);expect(h.controlled.active).toBe(false);expect(h.ctx.ui.input).not.toHaveBeenCalled();
+ await h.command();await h.input('A');const id=h.app.getSetting('activeSession'),shown=(await h.app.study.inspect(id!)).question!.presentationId;
+ await h.command('stats');const card=h.cards.at(-1).content;expect(card).toContain('正确率 100%');expect(card).not.toMatch(/numerator|denominator|historical|\{/);
+ h.ctx.ui.select.mockImplementation(async(_title:string,options:string[])=>options.find(o=>o.endsWith('. 成绩')));
+ await h.command('menu');expect(h.cards.at(-1).content).toBe(card);expect((await h.app.study.inspect(id!)).question!.presentationId).toBe(shown);
+});

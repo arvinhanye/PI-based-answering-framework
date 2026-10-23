@@ -1,3 +1,4 @@
+import { progressCard } from '../../presentation/progress.js';
 import { formatMoney } from '../../presentation/money.js';
 import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 import { createStudyRenderer } from './renderer.js';
@@ -116,15 +117,14 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
         await controlled.enter(ctx);
         await display(ctx);
     };
+    const showStats = async () => {
+        const bankId = app.getSetting('activeBank') ?? (await app.banks.list())[0]?.id;
+        if (!bankId) { send('尚无题库，请先用 study import 导入'); return; }
+        send(progressCard(await app.stats.read({bankId, timezone: app.getSetting('timezone'), examDate: app.getSetting('examDate')})));
+    };
     const menu = async (ctx: ExtensionContext) => {
         const banks = await app.banks.list(), sessions = await app.study.listSessions();
-        const rows = [...banks.map(b => ({ label: '切换题库 · ' + b.name, run: async () => { app.setSetting('activeBank', b.id); app.setSetting('activeSession', ''); await start('', ctx); } })), ...sessions.map(s => ({ label: `恢复 · ${s.sourceId ? sourceLabel(s.sourceId) : '全库'} · ${new Date(s.createdAt).toLocaleString('zh-CN')} · 已做 ${s.answered ?? 0} 题`, run: async () => { await app.study.resume(s.id, action()); app.setSetting('activeSession', s.id); app.setSetting('activeBank', s.bankId); await controlled.enter(ctx); await display(ctx); } })), { label: '成绩', run: async () => {
-                    const b = app.getSetting('activeBank');
-                    if (!b)
-                        return;
-                    const stats = await app.stats.read({ bankId: b, timezone: app.getSetting('timezone') });
-                    send(`成绩（参考）\n正确 ${stats.historical.numerator} / 已判分 ${stats.historical.denominator}\n${Object.entries(stats.current).map(([label, v]) => `${label === 'independent' ? '独立作答' : '辅助作答'}：${v.numerator} / ${v.denominator}`).join('\n')}`);
-                } }, { label: '预算', run: async () => {
+        const rows = [...banks.map(b => ({ label: '切换题库 · ' + b.name, run: async () => { app.setSetting('activeBank', b.id); app.setSetting('activeSession', ''); await start('', ctx); } })), ...sessions.map(s => ({ label: `恢复 · ${s.sourceId ? sourceLabel(s.sourceId) : '全库'} · ${new Date(s.createdAt).toLocaleString('zh-CN')} · 已做 ${s.answered ?? 0} 题`, run: async () => { await app.study.resume(s.id, action()); app.setSetting('activeSession', s.id); app.setSetting('activeBank', s.bankId); await controlled.enter(ctx); await display(ctx); } })), { label: '成绩', run: showStats }, { label: '预算', run: async () => {
                     const b = app.budget.snapshot();
                     const v = await ctx.ui.input(`本月已用 ${formatMoney(b.spentCny)} 元，修改月上限`, b.limitCny);
                     if (v !== undefined && v.trim()) {
@@ -157,7 +157,7 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
         }
     };
     pi.registerMessageRenderer('study-card', createStudyRenderer(app.dataDir));
-    pi.registerCommand('study', { description: '刷题；menu 设置 / undo 撤销 / think 思考 / budget 金额 / exit 退出', handler: async (args, ctx) => guarded(ctx, async () => {
+    pi.registerCommand('study', { description: '刷题；stats 成绩 / menu 设置 / undo 撤销 / think 思考 / budget 金额 / exit 退出', handler: async (args, ctx) => guarded(ctx, async () => {
             const text = args.trim();
             if (text === 'exit') {
                 if (!ctx.isIdle()) {
@@ -173,6 +173,10 @@ export function registerStudy(pi: ExtensionAPI, app: StudyApp) {
             }
             if (!ctx.isIdle()) {
                 send('DeepSeek 正在回答，按 Esc 停止后再切题或修改设置。/study exit 可直接退出。');
+                return;
+            }
+            if (text === 'stats') {
+                await showStats();
                 return;
             }
             if (text.startsWith('budget')) {

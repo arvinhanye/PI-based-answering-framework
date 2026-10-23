@@ -1,3 +1,4 @@
+import { progressCard } from '../presentation/progress.js';
 import { describeIssues } from '../presentation/issues.js';
 import { formatMoney } from '../presentation/money.js';
 import { readFileSync } from 'node:fs';
@@ -29,7 +30,7 @@ export const HELP = `Pi Study 本地刷题（所有分数均为参考成绩）
   study restore 文件.zip --to 新目录 [--yes]
 公共参数：--data-dir 业务目录、--session 会话ID、--json
 多选写 AC；判断写 正确/错误；填空多个空用 | 分隔。普通文字不计分，answer 命令才提交。
-Pi 内使用 /study 直接开始作答，/study menu 设置。精学/测验/简答等完整功能正在后续阶段实现。`;
+Pi 内使用 /study 直接开始作答，/study menu 设置。/study stats 查看进度与成绩。后续范围见路线图。`;
 function parse(args: string[]) {
     const flags: Record<string, string | boolean> = {}, words: string[] = [];
     const boolean = new Set(['yes', 'json', 'unsure']);
@@ -159,7 +160,7 @@ export async function runCli(args: string[], options: {
             return await app.study.feedback(words[0] ?? pid);
         }
         if (command === 'stats')
-            return await app.stats.read({ bankId: requireBank(), sourceId: str('source'), topic: str('topic'), timezone: timezone() });
+            return await app.stats.read({ bankId: requireBank(), sourceId: str('source'), topic: str('topic'), timezone: timezone(), examDate: app.getSetting('examDate') });
         if (command === 'review')
             return (await app.review.queue({ bankId: requireBank(), sourceId: str('source'), timezone: timezone() })).map(q => ({ questionId: q.questionId, sourceKey: q.sourceKey, kind: q.kind, topics: q.topics }));
         if (command === 'pending')
@@ -240,6 +241,8 @@ export async function runCli(args: string[], options: {
 export function renderCli(result: any): string {
     if (typeof result === 'string')
         return result;
+    if (Array.isArray(result?.sources) && Array.isArray(result?.topics) && result?.current)
+        return progressCard(result);
     if (result?.question) {
         if (result.feedback)
             return resultCard(result.question, result.answer, result.feedback, result.budget);
