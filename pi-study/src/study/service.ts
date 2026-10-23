@@ -12,7 +12,7 @@ export class StudyService {
   }
   private session(id: string): Row {
     const s = this.row('SELECT * FROM sessions WHERE id=?', id);
-    if (!s || s.status !== 'active')
+    if (!s || !['active','completed'].includes(s.status))
       throw new CoreError('INVALID_INPUT', '会话不存在或已关闭');
     return s;
   }
@@ -64,6 +64,7 @@ export class StudyService {
   async next(sessionId: string): Promise<QuestionView | null> {
     return this.store.transaction(() => {
       const s = this.session(sessionId);
+      if(s.status==='completed')return null;
       if (s.current_id) {
         const p = this.presentation(sessionId);
         if (p.status === 'open')
@@ -85,7 +86,7 @@ export class StudyService {
         rows=count%5===4&&fresh.length?fresh:due.length?due:fresh.length?fresh:rows;
       }
       if (!rows.length) {
-        this.store.db.prepare('UPDATE sessions SET current_id=NULL WHERE id=?').run(sessionId);
+        this.store.db.prepare("UPDATE sessions SET current_id=NULL,status='completed' WHERE id=?").run(sessionId);
         return null;
       }
       const p = {
@@ -106,19 +107,6 @@ export class StudyService {
   async resume(sessionId: string, action: UserActionContext) {
     this.action(action, 'resume', this.session(sessionId).current_id ?? '');
     return this.inspect(sessionId);
-  }
-  async saveDraft(sessionId: string, answer: string[], action: UserActionContext, presentationId: string) {
-    return this.store.transaction(() => {
-      if(typeof presentationId !== 'string' || !presentationId) throw new CoreError('STALE_PRESENTATION','需要展示 ID');
-      const p = this.presentation(sessionId,presentationId);
-      if (p.status !== 'open')
-        throw new CoreError('ALREADY_FINALIZED', '题目已结束');
-      if (!Array.isArray(answer) || answer.some(x => typeof x !== 'string'))
-        throw new CoreError('INVALID_INPUT', '草稿格式错误');
-      this.action(action, 'draft', p.id);
-      this.store.db.prepare('UPDATE presentations SET draft=? WHERE id=?').run(JSON.stringify(answer), p.id);
-      return this.view(this.session(sessionId));
-    });
   }
   async submit(input: SubmissionInput, action: UserActionContext): Promise<SubmissionReceipt> {
     return this.store.transaction(() => {
@@ -160,7 +148,7 @@ export class StudyService {
     const old=this.row('SELECT * FROM review WHERE question_id=?',questionId);
     const stage=receipt.grade.correct&&!receipt.assisted&&input.confidence==='sure'?(old?.stage??-1)+1:0;
     const due=scheduleReview({stage,correct:!!receipt.grade.correct,assisted:receipt.assisted,confidence:input.confidence,examDate:cfg.examDate,timezone:cfg.timezone,now:new Date(receipt.createdAt)}).due;
-    const correct=receipt.assisted&&old?old.last_correct:receipt.grade.correct?1:0;
+    const correct=!receipt.grade.correct?0:receipt.assisted&&old?old.last_correct:1;
     this.store.db.prepare('INSERT INTO review VALUES(?,?,?,?) ON CONFLICT(question_id) DO UPDATE SET stage=excluded.stage,due=excluded.due,last_correct=excluded.last_correct').run(questionId,stage,due,correct);
   }
   async markAssisted(sessionId:string,action:UserActionContext,presentationId:string){
@@ -168,6 +156,7 @@ export class StudyService {
   }
   async undo(sessionId:string,action:UserActionContext){
     this.store.transaction(()=>{
+      if(!this.session(sessionId).current_id)throw new CoreError('INVALID_INPUT','只能撤销当前题的作答，进入下一题后无法撤销上一题');
       const p=this.presentation(sessionId);const sub=this.row('SELECT * FROM submissions WHERE presentation_id=? AND voided_at IS NULL',p.id);
       if(!sub||p.status!=='submitted')throw new CoreError('INVALID_INPUT','只能撤销当前题的作答，进入下一题后无法撤销上一题');
       this.action(action,'undo',p.id);
@@ -206,19 +195,6 @@ export class StudyService {
       this.store.db.prepare("UPDATE presentations SET status='revealed',assisted=1 WHERE id=?").run(p.id);
     });
     return this.feedback(presentationId);
-  }
-  async hint(sessionId: string, action: UserActionContext, presentationId: string) {
-    return this.store.transaction(() => {
-      if(typeof presentationId !== 'string' || !presentationId) throw new CoreError('STALE_PRESENTATION','需要展示 ID');
-      const p = this.presentation(sessionId,presentationId);
-      if (p.status !== 'open')
-        throw new CoreError('ALREADY_FINALIZED', '题目已结束');
-      this.action(action, 'hint', p.id);
-      this.store.db.prepare('UPDATE presentations SET assisted=1 WHERE id=?').run(p.id);
-      return {
-        text: '请先检查题目条件、选项差异与单位；本题已标记为辅助作答。'
-      };
-    });
   }
   async skip(sessionId: string, action: UserActionContext, presentationId: string) {
     return this.store.transaction(() => {

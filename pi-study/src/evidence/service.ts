@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { PaidRequest, RateCard } from '../budget/pricing.js';
+type RateCard = unknown;
+interface PaidRequest {requestId:string;endpoint:string;payload:Record<string,unknown>;rate?:RateCard;signal?:AbortSignal;}
 import { validateTargetUrl, acceptsSource, type SourcePolicy } from './policy.js';
 import { unavailablePageReason } from './availability.js';
 export interface VerifyInput {

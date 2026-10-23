@@ -62,3 +62,8 @@ it('four reviews are followed by a naturally ordered new question',async()=>{
  const seen=[];for(let i=0;i<5;i++){const q=(await app.study.next(session.id))!;seen.push(q.sourceId);await app.study.skip(session.id,action,q.presentationId);}
  expect(seen.slice(0,4).every(id=>id!=='first-docx')).toBe(true);expect(seen[4]).toBe('first-docx');
 });
+it('an assisted wrong answer enters the wrong queue even after prior independent correctness',async()=>{
+ const {app,session,bank}=await setup();const q=(await app.study.next(session.id))!;await submit(app,session.id,'A');
+ const second=await app.study.start({bankId:bank.id,selection:'sequential'});const same=(await app.study.next(second.id))!;expect(same.questionId).toBe(q.questionId);await app.study.markAssisted(second.id,action,same.presentationId);await submit(app,second.id,'B');
+ const third=await app.study.start({bankId:bank.id,selection:'wrong'});expect((await app.study.next(third.id))?.questionId).toBe(q.questionId);
+});

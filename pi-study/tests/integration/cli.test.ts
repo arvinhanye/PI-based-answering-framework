@@ -19,3 +19,10 @@ test('source policy is per bank and invalid updates preserve the previous policy
   }
  }finally{rmSync(home,{recursive:true,force:true});}
 });
+test('CLI answer cards include explanation, reject invalid options and undo excludes voided results',async()=>{
+ const {renderCli}=await import('../../src/cli/commands.js');const home=mkdtempSync(join(tmpdir(),'cli-cards-')),opts={home};try{
+ const bank=await runCli(['bank','create','test'],opts),file=join(home,'questions.json');writeFileSync(file,JSON.stringify({schemaVersion:1,source:{id:'first-docx',name:'1500题',sha256:'a'.repeat(64)},questions:[{sourceKey:'7',kind:'single',stem:'请选择甲',options:[{id:'A',text:'甲'},{id:'B',text:'乙'}],answer:['A'],rawAnswer:'A',explanation:'完整解析',topics:[],status:'ready',basisStatus:'source_only',issues:[],locations:[],assets:[]}],report:{candidateCount:1,ready:1,needsReview:0,gaps:[]}}));await runCli(['import',file,'--bank',bank.id],opts);const start=await runCli(['start'],opts);expect(renderCli(start)).toContain('第 7 题');expect(renderCli(start)).not.toContain(start.session.id);
+ await expect(runCli(['answer','AB'],opts)).rejects.toThrow('单选');expect((await runCli(['stats'],opts)).attempts).toBe(0);
+ const answer=await runCli(['answer','B?'],opts);expect(renderCli(answer)).toContain('✗ 错误');expect(renderCli(answer)).toContain('完整解析');await runCli(['undo'],opts);await runCli(['answer','A'],opts);expect((await runCli(['stats'],opts)).historical).toEqual({numerator:1,denominator:1});
+ }finally{rmSync(home,{recursive:true,force:true});}
+});

@@ -1,0 +1,20 @@
+import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import assert from 'node:assert/strict';
+import {createAgentSession,DefaultResourceLoader,SessionManager,SettingsManager,ModelRuntime} from '@earendil-works/pi-coding-agent';import {createAssistantMessageEventStream} from '@earendil-works/pi-ai';
+import {createApp} from '../../dist/composition.js';import {registerStudy} from '../../dist/adapters/pi/index.js';
+const dir=mkdtempSync(join(tmpdir(),'pi-flow-')),app=createApp({home:join(dir,'study')}),captures=[];let session;
+const bank=await app.banks.create('SDK回归题库');await app.banks.importBank({schemaVersion:1,source:{id:'first-docx',name:'1500题',sha256:'fixture'},questions:[1,2].map(n=>({sourceKey:String(n),kind:'single',stem:`CURRENT_STEM_${n}`,options:[{id:'A',text:'one'},{id:'B',text:'two'}],answer:['A'],rawAnswer:'A',explanation:`SOURCE_EXPLANATION_${n}`,topics:[],status:'ready',basisStatus:'source_only',issues:[],locations:[],assets:[]})),report:{candidateCount:2,ready:2,needsReview:0,gaps:[]}},bank.id);
+const model={id:'deepseek-flash',name:'Local capture',provider:'deepseek',api:'openai-completions',baseUrl:'http://offline.invalid',reasoning:true,input:['text'],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:131072,maxTokens:64};
+const settings=SettingsManager.inMemory({compaction:{enabled:false},retry:{enabled:false},cacheWarming:{enabled:false}});
+const loader=new DefaultResourceLoader({cwd:dir,agentDir:dir,settingsManager:settings,noExtensions:true,noSkills:true,noPromptTemplates:true,noThemes:true,noContextFiles:true,extensionFactories:[pi=>{
+ pi.registerProvider('deepseek',{baseUrl:model.baseUrl,apiKey:'synthetic-local-fixture',api:model.api,models:[model],streamSimple:(m,context)=>{captures.push(JSON.stringify(context));const stream=createAssistantMessageEventStream();const message={role:'assistant',content:[{type:'text',text:`LOCAL_ANSWER_${captures.length}`}],api:m.api,provider:m.provider,model:m.id,usage:{input:100,output:20,cacheRead:10,cacheWrite:0,totalTokens:130,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:'stop',timestamp:Date.now()};stream.push({type:'done',reason:'stop',message});stream.end(message);return stream;}});registerStudy(pi,app);
+}]});
+try{
+ await loader.reload();const runtime=await ModelRuntime.create({authPath:join(dir,'auth.json'),modelsPath:join(dir,'models.json'),allowModelNetwork:false,refreshOnCreate:false});({session}=await createAgentSession({cwd:dir,agentDir:dir,settingsManager:settings,modelRuntime:runtime,resourceLoader:loader,model,tools:[],thinkingLevel:'off',sessionManager:SessionManager.inMemory(dir)}));await session.bindExtensions({});
+ await session.prompt('/study');assert.match(JSON.stringify(session.state.messages),/CURRENT_STEM_1/);
+ await session.prompt('AB');assert.equal(captures.length,0);await session.prompt('B');assert.match(JSON.stringify(session.state.messages),/✗ 错误/);
+ await session.prompt('解释当前题');await session.prompt('再举一个例子');assert.equal(captures.length,2);assert.match(captures[0],/SOURCE_EXPLANATION_1/);assert.match(captures[1],/LOCAL_ANSWER_1/);
+ await session.prompt('n');await session.prompt('提示思路');assert.equal(captures.length,3);assert.match(captures[2],/CURRENT_STEM_2/);assert.doesNotMatch(captures[2],/CURRENT_STEM_1|SOURCE_EXPLANATION|LOCAL_ANSWER_1|再举一个例子/);
+ await session.prompt('A?');await session.prompt('/study undo');await session.prompt('A');assert.equal((await app.stats.read({bankId:bank.id})).historical.denominator,2);
+ const spent=app.budget.snapshot().spentCny;assert.equal(spent,'0.0010812');const transcript=JSON.stringify(session.state.messages);assert.match(transcript,/SOURCE_EXPLANATION_1/);await session.prompt('/study exit');
+ console.log(JSON.stringify({requests:captures.length,followupContext:true,previousQuestionExcluded:true,transcriptPreserved:true,directAnswerUndo:true,spentCny:spent,localProvider:true}));
+}finally{session?.dispose();app.close();rmSync(dir,{recursive:true,force:true});}

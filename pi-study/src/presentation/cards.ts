@@ -1,19 +1,26 @@
-import type {QuestionView,FeedbackView} from '../contracts.js';
-export interface CardBudget{spentCny:string;limitCny:string;}
-const kinds={single:'单选',multiple:'多选',truefalse:'判断',fill:'填空',short:'简答'};
-export function sourceLabel(id:string){return ({'first-docx':'1500题','province-docx':'省赛','wlan-pdf':'PDF','pdf':'PDF'} as Record<string,string>)[id]??'当前题库';}
-const money=(budget:CardBudget)=>`本月已用 ${budget.spentCny} / ${budget.limitCny} 元`;
-function displayAnswer(q:QuestionView,answer:string[]){return answer.map(v=>q.kind==='truefalse'?v==='true'?'对':v==='false'?'错':v:v).join(q.kind==='fill'?' | ':'、');}
-export function questionCard(q:QuestionView,progress:{correct:number;total:number},budget:CardBudget,label=sourceLabel(q.sourceId)):string{
- const header=[`第 ${q.sourceKey} 题`,kinds[q.kind],...q.topics,label].join(' · ');
- const images=q.assets.filter(a=>a.role==='question').length;
- return [`${header}      本轮 ${progress.correct}/${progress.total} ✓`,q.stem,...q.options.map(o=>`${o.id}. ${o.text}`),q.status==='needs_review'?'⚠ 这题资料有问题，可以练但不计分':'',images?`📎 ${images} 张题图，Ctrl+Alt+O 打开`:'',`${q.kind==='fill'?'输入 =答案（多空用 | 分隔）':'输入答案'}，或直接打字问 DeepSeek（${money(budget)}）`,'n / Ctrl+Alt+N 下一题 · /study menu 设置 · /study exit 退出'].filter(Boolean).join('\n');
+import type { QuestionView, FeedbackView } from '../contracts.js';
+export interface CardBudget {
+    spentCny: string;
+    limitCny: string;
 }
-export function resultCard(q:QuestionView,answer:string[],feedback:FeedbackView,budget:CardBudget):string{
- const correct=displayAnswer(q,feedback.answer)||feedback.rawAnswer||'未提供';const scored=feedback.grade?.status==='scored';
- const heading=!scored?`这题资料有问题，本次不计分　题库答案：${correct}`:feedback.grade!.correct?`✓ 正确　答案 ${correct}`:`✗ 错误　你选 ${displayAnswer(q,answer)}，正确答案 ${correct}`;
- const missing=q.kind==='multiple'?feedback.answer.filter(x=>!answer.includes(x)):[];
- const extra=q.kind==='multiple'?answer.filter(x=>!feedback.answer.includes(x)):[];
- const differences=[missing.length?`漏选 ${missing.join('、')}`:'',extra.length?`多选 ${extra.join('、')}`:''].filter(Boolean).join(' · ');
- return [heading,scored?differences:'',feedback.explanation?`解析：${feedback.explanation}`:'题库未提供解析',...feedback.issues.map(i=>`⚠ 资料提示：${i}`),`n 下一题 · 直接打字问 DeepSeek（${money(budget)}）`,'/study undo 撤销本题作答'].filter(Boolean).join('\n');
+const kinds = { single: '单选', multiple: '多选', truefalse: '判断', fill: '填空', short: '简答' };
+export function sourceLabel(id: string) { return ({ 'first-docx': '1500题', 'province-docx': '省赛', 'wlan-pdf': 'PDF', 'pdf': 'PDF' } as Record<string, string>)[id] ?? '当前题库'; }
+const money = (budget: CardBudget) => `本月已用 ${budget.spentCny} / ${budget.limitCny} 元`;
+function displayAnswer(q: QuestionView, answer: string[]) { return answer.map(v => q.kind === 'truefalse' ? v === 'true' ? '对' : v === 'false' ? '错' : v : v).join(q.kind === 'fill' ? ' | ' : '、'); }
+export function questionCard(q: QuestionView, progress: {
+    correct: number;
+    total: number;
+}, budget: CardBudget, label = sourceLabel(q.sourceId)): string {
+    const header = [`第 ${q.sourceKey} 题`, kinds[q.kind], ...q.topics, label].join(' · ');
+    const images = q.assets.filter(a => a.role === 'question').length;
+    return [`${header}      本轮 ${progress.correct}/${progress.total} ✓`, q.stem, ...q.options.map(o => `${o.id}. ${o.text}`), q.status === 'needs_review' ? '⚠ 这题资料有问题，可以练但不计分' : '', images ? `📎 ${images} 张题图，Ctrl+Alt+O 打开` : '', `${q.kind === 'fill' ? '输入 =答案（多空用 | 分隔）' : '输入答案'}，或直接打字问 DeepSeek（${money(budget)}）`, 'n / Ctrl+Alt+N 下一题 · /study menu 设置 · /study exit 退出'].filter(Boolean).join('\n');
+}
+export function resultCard(q: QuestionView, answer: string[], feedback: FeedbackView, budget: CardBudget): string {
+    const correct = displayAnswer(q, feedback.answer) || feedback.rawAnswer || '未提供';
+    const scored = feedback.grade?.status === 'scored';
+    const heading = !scored ? `这题资料有问题，本次不计分　题库答案：${correct}` : feedback.grade!.correct ? `✓ 正确　答案 ${correct}` : `✗ 错误　你选 ${displayAnswer(q, answer)}，正确答案 ${correct}`;
+    const missing = q.kind === 'multiple' ? feedback.answer.filter(x => !answer.includes(x)) : [];
+    const extra = q.kind === 'multiple' ? answer.filter(x => !feedback.answer.includes(x)) : [];
+    const differences = [missing.length ? `漏选 ${missing.join('、')}` : '', extra.length ? `多选 ${extra.join('、')}` : ''].filter(Boolean).join(' · ');
+    return [heading, scored ? differences : '', feedback.explanation ? `解析：${feedback.explanation}` : '题库未提供解析', ...feedback.issues.map(i => `⚠ 资料提示：${i}`), `n 下一题 · 直接打字问 DeepSeek（${money(budget)}）`, '/study undo 撤销本题作答'].filter(Boolean).join('\n');
 }

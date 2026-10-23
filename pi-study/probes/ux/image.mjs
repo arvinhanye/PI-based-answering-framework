@@ -1,0 +1,12 @@
+// One bounded native DeepSeek request. Credentials never enter output or files.
+import {DatabaseSync,backup} from 'node:sqlite';import {readFileSync,existsSync} from 'node:fs';import {join} from 'node:path';import {ModelRuntime} from '@earendil-works/pi-coding-agent';import {SoftBudgetService} from '../../dist/budget/ledger.js';import {appPaths} from '../../dist/storage/paths.js';
+const home=appPaths().home,finance=join(home,'finance.sqlite');
+const backupPath=finance+'.before-soft-20261023';if(existsSync(finance)&&!existsSync(backupPath)){const db=new DatabaseSync(finance,{readOnly:true});await backup(db,backupPath);db.close();}
+const b=new SoftBudgetService({path:finance}),ticket=b.begin();
+try{
+ const dir=JSON.parse(readFileSync(join(home,'current-space.json'),'utf8')).path;const db=new DatabaseSync(join(dir,'study.sqlite'),{readOnly:true});const row=db.prepare("SELECT payload FROM revisions r WHERE EXISTS(SELECT 1 FROM json_each(r.payload,'$.assets') a WHERE json_extract(a.value,'$.role')='question') LIMIT 1").get();db.close();const q=JSON.parse(row.payload),a=q.assets.find(a=>a.role==='question');
+ const runtime=await ModelRuntime.create({allowModelNetwork:false,refreshOnCreate:false});const model=runtime.getModel('deepseek','deepseek-flash');if(!model)throw Error('model missing');
+ const result=await runtime.completeSimple(model,{messages:[{role:'user',content:[{type:'text',text:'只根据图片回答：左右两个无线区域的 VLAN 编号和 SSID 分别是什么？用一句中文。'},{type:'image',mimeType:a.mime,data:readFileSync(join(dir,a.path)).toString('base64')}],timestamp:Date.now()}]},{maxTokens:128,reasoning:'off',signal:AbortSignal.timeout(45000)});
+ b.record(ticket,result.usage);const text=result.content.filter(c=>c.type==='text').map(c=>c.text).join('');
+ console.log(JSON.stringify({stopReason:result.stopReason,usage:{input:result.usage.input,output:result.usage.output,cacheRead:result.usage.cacheRead,cacheWrite:result.usage.cacheWrite},verifiedImage:/10/.test(text)&&/20/.test(text)&&/Huawei/i.test(text),response:text,errorCategory:result.stopReason==='error'?(/image|vision|图片/i.test(result.errorMessage??'')?'image-rejected':/401|auth/i.test(result.errorMessage??'')?'authentication':'request-failed'):undefined,spentCny:b.snapshot().spentCny}));
+}catch(e){console.log(JSON.stringify({success:false,errorCategory:e?.name==='TimeoutError'?'timeout':'request-failed'}));process.exitCode=1;}finally{b.close();}

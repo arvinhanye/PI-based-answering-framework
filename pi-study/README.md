@@ -1,12 +1,12 @@
 # Pi Study
 
-面向个人本地学习的 Pi 工具包与 CLI。题库通过标准 JSON 导入，模型、Pi 交互与学习核心分离；所有成绩均为**参考成绩**。
+个人本地刷题包，支持 Pi 对话和独立 CLI。三份题库通过标准 JSON 导入；成绩是学习参考分，原件有缺答、冲突或结构问题的题不计分。
 
-当前交付目标是三来源可刷的 MVP。支持客观题快刷、明确提交、草稿恢复、独立/辅助统计、来源筛选、复习调度、题图、备份，以及受预算控制的 DeepSeek 文本讲解和手动查证。简答评分、精学/测验、通用去重迁移及自动证据缓存属于后续完整首版；未实现功能不会注册为可用工具。实际验收状态见 `docs/acceptance/checklist.md`。
+当前支持客观题快刷、直接作答、撤销、错题复习、跨会话恢复、多题库、题图、备份，以及 Pi 原生 DeepSeek 流式讲解和连续追问。简答评分、精学/测验、通用去重迁移和联网查证工具留待后续。
 
-## 环境与安装
+## 安装与使用
 
-当前验收平台为 macOS，Node.js >=24；Pi 基线为 0.87.1。PDF 转换使用系统 PDFKit/Vision，通过 Xcode Command Line Tools 的 `clang` 编译本地 helper，不上传题库。
+Node.js >=24，Pi 0.87.1；当前实际验收平台为 macOS。PDF 转换用系统 PDFKit/Vision，需要 Xcode Command Line Tools。
 
 ```sh
 cd pi-study
@@ -17,27 +17,67 @@ pi install --local ./pi-study
 pi
 ```
 
-在这个目录启动 Pi 后输入 `/study`，进入“题库与会话”选择题库并开始 quick；已有会话选择“继续刷题”。题目页选择“提交答案”，输入 A / AC 后确认，再选“下一题”。每个子页面 Esc 返回上一级；主菜单 Esc 打开退出学习确认。`/study-answer` 可直达作答流程，`/study-exit` 可直达退出确认。普通聊天文字不自动计分。学习态底栏显示 local-quick，因为判题在本地完成；“DeepSeek 状态”显示凭证及费率是否就绪，讲解/查证确认后才联网，真正联网只通过本包的费用网关；退出学习恢复原模型和工具。其他本地扩展不属于安全隔离范围。
+本机已安装本地包。升级构建后退出并重启 Pi，加载新扩展；输入 `/study` 直接看到当前题。首次会问比赛日期，可以留空或 Esc 跳过。程序不默认填写日期。
 
-若 Pi 提示项目尚未信任并拒绝修改本地包配置，核对路径后执行 `pi install --local --approve ./pi-study`。本机已完成项目安装，可直接在仓库目录启动 Pi；已打开的旧 Pi 会话需要重启以加载扩展。
+| 输入 | 操作 |
+| --- | --- |
+| `/study` | 继续当前轮；没有会话时从全库开始 |
+| `/study 1500`、`/study 省赛`、`/study pdf` | 按来源开一轮 |
+| `/study 错题`、`/study 省赛 错题` | 只刷尚未独立答对的错题 |
+| `/study 1500 随机` | 新题打乱，复习题仍优先 |
+| `A`、`选B`、`AC`、`a c`、`A,C` | 输入并回车即判分 |
+| `对`、`错`、`T`、`F` | 判断题作答 |
+| `=答案`、`=第一空\|第二空` | 填空题作答，保留大小写和内部空格 |
+| `B?`、`AC？` | 作答并记为不确定，次日复习 |
+| `n`、`下`、`Ctrl+Alt+N` | 下一题；未作答时跳过 |
+| 普通文字，如 `B为什么不对` | 直接问 DeepSeek，可连续追问 |
+| `/study undo` | 撤销当前题作答并重答；换题后不能撤销上一题 |
+| `/study think` | 开关思考模式，进入学习时默认关 |
+| `Ctrl+Alt+O` | 打开当前题第一张题图，多张时列出路径 |
+| `/study menu` | 一层设置：题库、恢复会话、成绩、预算、比赛日期、答对自动下一题 |
+| `/study budget 20` | 将月上限改为 20 元 |
+| `/study exit` | 退出学习，恢复原模型、工具和思考设置 |
 
-独立 CLI 不要求模型凭证：
+Pi 自带 Ctrl+N/Ctrl+O 已有用途，因此本包用 Ctrl+Alt+N/Ctrl+Alt+O。菜单 Esc 返回当前题。没有作答确认框；重复提交已答题不会重复计分。单选输入 `AB`、选项越界只提示，不计分也不发模型。模糊的普通文字优先当提问。
+
+题目和结果留在对话区，完整显示原解析。答前提问会记录辅助作答；独立与辅助成绩分开统计。错误、不确定和辅助作答次日复习；其余沿用 1/3/7/14/30 天间隔，受已设置比赛日期约束。每 4 道到期复习/错题插 1 道新题，新题默认按原题号及 1500→省赛→PDF 顺序。
+
+## DeepSeek 与费用
+
+沿用 Pi 的 DeepSeek 凭证：在 Pi `/login` 配置，或在启动 Pi 的终端设置 `DEEPSEEK_API_KEY`。不要把密钥发到聊天、题库或仓库。学习态使用内置 `deepseek/deepseek-flash`，关闭文件、bash 等模型工具；模型不能调用作答工具。无凭证仍能本地答题，提问时给出配置指引。手动换到其他模型会退出学习态。
+
+答前只发送题干、选项、考点及安全题图，引导思考；答后附作答、题库答案和解析。图像支持已用真实请求验证；超大或无法安全读取的图明确标为未发送。换题后旧问答仍在屏幕上，但不会发送给下一题。当前没有联网检索工具；模型讲解不等于权威来源核验。
+
+每自然月默认 10 元。Pi、CLI 和各题库共用 `finance.sqlite`。每次学习请求结束，按实际 usage 记账；80% 提醒一次，达到上限后不再发送新提问，本地答题照常。**这是软上限，最后一笔请求可能超额；真正的硬上限是 DeepSeek 账户预付余额。** 中断或服务异常若没有返回完整 usage，本地账单可能低于服务商实际账单，请以服务商为准。
+
+初始人民币费率（每百万 token）：输入 2 元、缓存命中 0.04 元、输出 8 元。无有效期、无核查时间、无费率下限、无预留占额。修改 `examples/rates.example.json` 中的数字即可更新，允许调低和设零。
+
+```sh
+node pi-study/dist/cli/index.js budget show
+node pi-study/dist/cli/index.js budget set 10
+node pi-study/dist/cli/index.js pricing show
+node pi-study/dist/cli/index.js pricing set pi-study/examples/rates.example.json
+```
+
+旧账本已结算费用和月限额迁入新账本；旧表保留作为历史记录，旧预留不再占额度。升级后请重启旧 Pi 进程，避免同时运行旧网关和新账本。
+
+## 独立 CLI
 
 ```sh
 node pi-study/dist/cli/index.js help
 node pi-study/dist/cli/index.js bank list
 node pi-study/dist/cli/index.js start --source first-docx
 node pi-study/dist/cli/index.js answer AC
-node pi-study/dist/cli/index.js feedback
 node pi-study/dist/cli/index.js next
+node pi-study/dist/cli/index.js undo
 node pi-study/dist/cli/index.js resume
 ```
 
-多选写 `AC` 或 `A,C`；判断写 `正确/错误`；多空填空用 `|` 分隔，命令内的大小写和空格保留。`--unsure` 记录不确定作答。`hint`、`reveal` 记录辅助状态。原材料缺条件或答案冲突时可练习，但不进入可评分分母。
+CLI 答题无需模型凭证，`answer` 直接显示结果和解析。加 `--json` 可保留结构化输出供脚本调用。填空多个空用 `|` 分隔，`--unsure` 标记不确定；问答请在 Pi 中进行。
 
 ## 转换与导入
 
-源码和安装包不包含个人题库、转换结果、学习数据或密钥。当前三份材料的本地转换/导入状态在验收报告中记录。新资料先转换为 `schema/question-bank-v1.schema.json`，再导入；“让模型读文件”不等于持久化导入。
+源码和安装包不包含个人题库、转换结果、学习记录或凭证。新材料先转为 `schema/question-bank-v1.schema.json`，再持久化导入。
 
 ```sh
 cd pi-study
@@ -52,48 +92,22 @@ node dist/cli/index.js import ./converted/pdf.json
 node dist/cli/index.js sources
 ```
 
-后续两次导入复用当前题库，三来源仍保留独立出处。PDF 全页处理，支持页 checkpoint；OCR 失败和原件缺答分别报告。标准导入复制原件快照及所有引用资产，临时转换目录移动后仍可学习。现有 DOCX/PDF 转换器针对已验证版式；任意新排版不承诺免配置正确分题。
+后两次导入复用当前题库，保留各自出处。PDF 全页处理并保留 checkpoint；OCR 失败与原件缺答分别报告。导入复制原件快照和引用资产，转换临时目录移走后仍能使用。现有转换器针对已验证版式，不承诺任意新排版免配置分题。
 
-## 联网与月预算
+## 数据与备份
 
-默认每自然月 10 CNY，Pi 与 CLI、不同题库共享同一个用户财务账本。Pi 中 `/login` 选择 DeepSeek 保存凭证，或在启动进程环境设置 `DEEPSEEK_API_KEY`；不要将密钥写入题库或仓库。
-
-```sh
-node dist/cli/index.js budget show
-node dist/cli/index.js budget set 10
-node dist/cli/index.js explain
-node dist/cli/index.js verify 'OSPF 邻居建立 site:support.huawei.com'
-```
-
-`explain/verify` 在提交或明确揭晓后开放。MVP 使用 `deepseek-flash`、纯文本、关闭 thinking、非流式、1024 输出 token 上限。一次生成按完整上下文保守预留约 2.106 元；收到用量后按峰值价格估计结算并释放差额，预留金额并非实扣。Search/Fetch 每次手动任务最多各一次。引用正文保存为证据，不自动改答案或分数。
-
-费率不设有效期，也不要求核查时间；价格变动时手动更新费率数字。未知费用、未证明上界时仍停止新付费请求。超时/断流保留未知占额，不自动释放。具体证据、限制与真实联调记录见 `docs/verification/budget-pricing.md`、`docs/acceptance/`。当前不支持流式付费调用和云端批量 OCR。
-
-每个题库的来源策略可独立设置。费率改动时编辑示例中的金额，明确确认后导入。此阶段仍保留费率下界等校验，后续按交互改造规格切换软记账。此限制只阻断付费调用，本地刷题不受影响。
+默认目录 `~/Library/Application Support/pi-study/`。当前数据空间由 `current-space.json` 指向，`study.sqlite` 保存题库与学习记录；预算账本独立，不随题库恢复回滚。`--data-dir` 仅改变业务目录。
 
 ```sh
-node dist/cli/index.js source-policy show
-node dist/cli/index.js source-policy set examples/source-policy.json
-node dist/cli/index.js pricing show
-node dist/cli/index.js pricing set '/路径/已核查费率.json' --yes
+node pi-study/dist/cli/index.js stats
+node pi-study/dist/cli/index.js settings exam-date 2026-11-13
+node pi-study/dist/cli/index.js settings timezone Asia/Shanghai
+node pi-study/dist/cli/index.js backup '/路径/学习备份.zip'
+node pi-study/dist/cli/index.js restore '/路径/学习备份.zip' --to '/路径/新空间'
+# 核对恢复预览后，重复上一条并加 --yes
 ```
 
-`examples/reviewed-rates.example.json` 提供初始费率数字；供应商调价时由用户更新。金额单位是十亿分之一元（nano CNY），每百万 token 单价与单次费用分开填写。CLI 和 Pi 使用同一当前业务空间配置，月预算账本则跨业务空间共享。
-
-## 数据与恢复
-
-默认数据在 `~/Library/Application Support/pi-study/`。`spaces/default/study.sqlite` 保存业务数据；`finance.sqlite`、identity/revision witness 独立保存预算，不随题库恢复回滚。`--data-dir` 只改变业务目录。
-
-```sh
-node dist/cli/index.js stats
-node dist/cli/index.js settings exam-date 2026-11-13
-node dist/cli/index.js settings timezone Asia/Shanghai
-node dist/cli/index.js backup '/路径/学习备份.zip'
-node dist/cli/index.js restore '/路径/学习备份.zip' --to '/路径/恢复的新空间'
-# 核对预览后，重复上一条并加 --yes
-```
-
-示例日期只是设置用法；程序不会默认填写比赛日期。备份含 SQLite 一致性快照、三源原件/JSON、题图、证据和设置，不含可回滚财务库与凭证。恢复写新目录，校验失败保持旧空间。MVP 备份/展开容量上限 512 MiB，条目上限 10 万。
+备份包含业务数据库、原件/JSON、题图、已有证据和设置，不含财务库与凭证；恢复写新目录，校验失败不改旧空间。容量上限 512 MiB，最多 10 万条目。迁移到另一台机器时，退出 Pi 后另行安全复制财务库；凭证在新机单独配置。
 
 ## 开发检查
 
@@ -101,7 +115,8 @@ node dist/cli/index.js restore '/路径/学习备份.zip' --to '/路径/恢复�
 npm run typecheck
 npm test
 npm run build
+node probes/ux/flow.mjs
 npm pack --dry-run
 ```
 
-无需凭证的测试使用明确人工样本或故障服务，不冒充真实账单/人工题库真值。源文件在上级目录存在时另执行真实来源转换回归；本仓库不分发原件。设计与分阶段计划位于上级 `docs/superpowers/`。
+`flow.mjs` 使用实际 Pi SDK 和本地捕获服务，不发网络。真实付费和终端验收另见 `docs/acceptance/2026-10-23-ux-redesign.md`；历史报告中旧菜单、网关和费率政策不适用于当前版。

@@ -4,7 +4,7 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "description": "本地题库学习、参考判分与受控资料查证",
+  "description": "本地题库快刷、Pi 原生 DeepSeek 讲解和月度软预算",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -33,14 +33,15 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "convert:first": "node converters/first-docx.mjs",
     "convert:province": "node converters/province-docx.mjs",
     "convert:pdf": "node converters/pdf.mjs"
   },
   "peerDependencies": {
+    "@earendil-works/pi-ai": "^0.87.1",
     "@earendil-works/pi-coding-agent": "^0.87.1",
-    "@earendil-works/pi-ai": "^0.87.1"
+    "@earendil-works/pi-tui": "^0.87.1"
   },
   "dependencies": {
     "adm-zip": "0.5.16",
@@ -50,6 +51,7 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.87.1",
     "@earendil-works/pi-coding-agent": "^0.87.1",
+    "@earendil-works/pi-tui": "^0.87.1",
     "@types/adm-zip": "0.5.7",
     "@types/node": "24.10.1",
     "typescript": "5.9.3",

@@ -102,22 +102,16 @@ it('no_answers_feedback_lock_stale_guard_and_idempotency', async () => {
     code: 'STALE_PRESENTATION'
   });
 });
-it('restart_preserves_draft_presentation_assisted', async () => {
+it('restart_preserves_presentation_assisted', async () => {
   const { dir, store, service, session } = await setup();
   const q = (await service.next(session.id))!;
-  await service.saveDraft(session.id, [
-    'B'
-  ], action, q.presentationId);
-  await service.hint(session.id, action, (await service.inspect(session.id)).question!.presentationId);
+  await service.markAssisted(session.id, action, (await service.inspect(session.id)).question!.presentationId);
   store.close();
   const reopened = new StudyStore(dir);
   stores.push(reopened);
   const svc = new StudyService(reopened);
   const snap = await svc.resume(session.id, action);
   expect(snap.question?.presentationId).toBe(q.presentationId);
-  expect(snap.draft).toEqual([
-    'B'
-  ]);
   expect(snap.assisted).toBe(true);
   expect((await svc.next(session.id))?.presentationId).toBe(q.presentationId);
   const receipt = await svc.submit({
@@ -157,7 +151,7 @@ it('latest_independent_separate_from_assisted_and_history', async () => {
     bankId: bank.bankId, selection: 'sequential'
   });
   const q3 = (await service.next(s3.id))!;
-  await service.hint(s3.id, action, (await service.inspect(s3.id)).question!.presentationId);
+  await service.markAssisted(s3.id, action, (await service.inspect(s3.id)).question!.presentationId);
   await service.submit({
     sessionId: s3.id, presentationId: q3.presentationId, questionRevisionId: q3.questionRevisionId, answer: [
       'B'
@@ -193,7 +187,7 @@ it('same_source_import_without_bank_is_idempotent', async () => {
   expect(result.duplicates).toBe(2);
   expect((await new BankService(store).list()).length).toBe(1);
 });
-it('unscorable_does_not_create_weakness_and_assisted_does_not_replace_independent', async () => {
+it('assisted_wrong_enters_review_without_replacing_independent_statistics', async () => {
   const { store, service, session, bank } = await setup();
   const q = (await service.next(session.id))!;
   await service.submit({
@@ -205,7 +199,7 @@ it('unscorable_does_not_create_weakness_and_assisted_does_not_replace_independen
     bankId: bank.bankId, selection: 'sequential'
   });
   const next = (await service.next(s.id))!;
-  await service.hint(s.id, action, (await service.inspect(s.id)).question!.presentationId);
+  await service.markAssisted(s.id, action, (await service.inspect(s.id)).question!.presentationId);
   await service.submit({
     sessionId: s.id, presentationId: next.presentationId, questionRevisionId: next.questionRevisionId, answer: [
       'B'
@@ -213,7 +207,8 @@ it('unscorable_does_not_create_weakness_and_assisted_does_not_replace_independen
   }, action);
   expect((await new StatisticsService(store).read({
     bankId: bank.bankId
-  })).wrong).toBe(0);
+  })).wrong).toBe(1);
+  expect((await new StatisticsService(store).read({bankId:bank.bankId})).current.independent).toEqual({numerator:1,denominator:1});
 });
 it('unscorable_has_no_review_row_or_statistics_denominator', async () => {
   const { store, service, session, bank } = await setup();
@@ -251,7 +246,7 @@ it('ambiguous_or_invalid_action_cannot_submit', async () => {
   expect(store.db.prepare('SELECT count(*) AS n FROM submissions').get()!.n).toBe(0);
 });
 it('missing_presentation_and_revision_never_default_to_current',async()=>{const {service,session,store}=await setup();await service.next(session.id);await expect(service.submit({sessionId:session.id,answer:['A'],confidence:'sure',idempotencyKey:'missing'} as any,action)).rejects.toThrow();expect(store.db.prepare('SELECT COUNT(*) n FROM submissions').get()?.n).toBe(0);});
-it('late_skip_and_draft_are_bound_to_original_presentation',async()=>{const {service,session}=await setup();const old=(await service.next(session.id))!;await (service.skip as any)(session.id,action,old.presentationId);const current=(await service.next(session.id))!;await expect((service.skip as any)(session.id,action,old.presentationId)).rejects.toMatchObject({code:'STALE_PRESENTATION'});await expect((service.saveDraft as any)(session.id,['B'],action,old.presentationId)).rejects.toMatchObject({code:'STALE_PRESENTATION'});expect((await service.inspect(session.id)).question?.presentationId).toBe(current.presentationId);});
+it('late_skip_is_bound_to_original_presentation',async()=>{const {service,session}=await setup();const old=(await service.next(session.id))!;await (service.skip as any)(session.id,action,old.presentationId);const current=(await service.next(session.id))!;await expect((service.skip as any)(session.id,action,old.presentationId)).rejects.toMatchObject({code:'STALE_PRESENTATION'});expect((await service.inspect(session.id)).question?.presentationId).toBe(current.presentationId);});
 it('unimplemented_modes_are_rejected_instead_of_silent_quick',async()=>{const {service,bank}=await setup();await expect(service.start({bankId:bank.bankId,mode:'exam'})).rejects.toThrow(/暂未/);});
 it('due_queue_and_statistics_use_configured_calendar_day',async()=>{const {service,session,store,bank}=await setup();const q=(await service.next(session.id))!;await service.submit({sessionId:session.id,presentationId:q.presentationId,questionRevisionId:q.questionRevisionId,answer:['A'],confidence:'sure',idempotencyKey:'calendar'},action);store.db.prepare('UPDATE review SET due=?').run('2026-10-23');const {vi}=await import('vitest');const {ReviewService}=await import('../../src/review/service.js');vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-23T00:30:00Z'));try{expect((await new StatisticsService(store).read({bankId:bank.bankId,timezone:'America/Los_Angeles'} as any)).due).toBe(0);expect(await new ReviewService(store).queue({bankId:bank.bankId,timezone:'America/Los_Angeles'} as any)).toHaveLength(0);}finally{vi.useRealTimers();}});
 
