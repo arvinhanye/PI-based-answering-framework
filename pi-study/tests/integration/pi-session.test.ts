@@ -11,36 +11,96 @@ import {createApp} from '../../src/composition.js';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-function harness(){const dir=mkdtempSync(join(tmpdir(),'pi-test-')),app=createApp({home:dir,dataDir:join(dir,'data')});const handlers:Record<string,any>={},tools:any[]=[],commands:Record<string,any>={};let current=['read','bash'];const old={provider:'old',id:'old'};const model={provider:'study-offline',id:'local-quick'};const pi={registerProvider(){},registerCommand(n:string,v:any){commands[n]=v;},on(n:string,v:any){handlers[n]=v;},registerTool(t:any){tools.push(t);},getActiveTools:()=>current.slice(),setActiveTools:(v:string[])=>{current=v;},setModel:async()=>true};const state=registerStudy(pi as any,app);const ui={notify(){},select:async()=>undefined};const ctx={mode:'tui',hasUI:true,ui,model:old,modelRegistry:{find:()=>model}};return {app,state,handlers,tools,commands,ctx,pi,getTools:()=>current,close(){app.close();rmSync(dir,{recursive:true,force:true});}};}
-it('extension_triggered_slash_cannot_score',async()=>{const h=harness();try{await h.commands.study.handler('submit A',{...h.ctx,mode:'rpc'});expect(h.state.active).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM audit').get()?.n).toBe(0);await h.commands.study.handler('submit A',h.ctx);expect(h.state.active).toBe(true);expect(h.app.store.db.prepare('SELECT count(*) n FROM audit').get()?.n).toBe(0);}finally{h.close();}});
+function harness(){const dir=mkdtempSync(join(tmpdir(),'pi-test-')),app=createApp({home:dir,dataDir:join(dir,'data')});const handlers:Record<string,any>={},tools:any[]=[],commands:Record<string,any>={};let current=['read','bash'];const old={provider:'old',id:'old'};const model={provider:'study-offline',id:'local-quick'};const pi={registerProvider(){},registerCommand(n:string,v:any){commands[n]=v;},on(n:string,v:any){handlers[n]=v;},registerTool(t:any){tools.push(t);},getActiveTools:()=>current.slice(),setActiveTools:(v:string[])=>{current=v;},setModel:async()=>true};const state=registerStudy(pi as any,app);const ui={notify(){},select:async()=>undefined,confirm:async()=>true};const ctx={mode:'tui',hasUI:true,ui,model:old,modelRegistry:{find:()=>model}};return {app,state,handlers,tools,commands,ctx,pi,getTools:()=>current,close(){app.close();rmSync(dir,{recursive:true,force:true});}};}
+it('extension_triggered_slash_cannot_score',async()=>{const h=harness();try{await h.commands.study.handler('submit A',{...h.ctx,mode:'rpc'});expect(h.state.active).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM audit').get()?.n).toBe(0);await h.commands.study.handler('submit A',h.ctx);expect(h.state.active).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM audit').get()?.n).toBe(0);}finally{h.close();}});
 it('tools_exclude_privileged_writes',()=>{const h=harness();try{expect(h.tools.map(t=>t.name).sort()).toEqual(['study_banks','study_budget','study_feedback','study_pending','study_question','study_session','study_stats']);for(const t of h.tools)expect(t.parameters.type).toBe('object');}finally{h.close();}});
 it('restores tools when external model chosen',async()=>{const h=harness();try{await h.state.enter(h.ctx as any);expect(h.getTools()).toEqual([]);await h.handlers.model_select({model:{provider:'external',id:'paid'}},h.ctx);expect(h.state.active).toBe(false);expect(h.getTools()).toEqual(['read','bash']);}finally{h.close();}});
 it('refuses controlled state if setModel returns false',async()=>{const h=harness();try{h.pi.setModel=async()=>false;await expect(h.state.enter(h.ctx as any)).rejects.toThrow('无法切换');expect(h.state.active).toBe(false);expect(h.getTools()).toEqual(['read','bash']);}finally{h.close();}});
-import {studyMenu} from '../../src/adapters/pi/ui.js';
+import {studyAction,type LearningFactory} from '../../src/adapters/pi/ui.js';
+async function runSelectedAction(app:any,session:any,ctx:any,factory?:LearningFactory){return studyAction(app,session,ctx,await ctx.ui.select(),factory);}
+async function seedNavigation(h:ReturnType<typeof harness>){
+ const imported=await h.app.banks.importBank({schemaVersion:1,source:{id:'nav',name:'Navigation',sha256:'nav-fixture'},report:{candidateCount:1,ready:1,needsReview:0,gaps:[]},questions:[{sourceKey:'1',kind:'single',stem:'Choose one',options:[{id:'A',text:'one'},{id:'B',text:'two'}],answer:['A'],rawAnswer:'A',explanation:'Local explanation',topics:[],status:'ready',basisStatus:'source_only',issues:[],locations:[],assets:[]}]});
+ h.app.setSetting('activeBank',imported.bankId);
+ const session=await h.app.study.start({bankId:imported.bankId});h.app.setSetting('activeSession',session.id);await h.app.study.next(session.id);
+}
+it.each(['input','confidence','confirmation'])('quick answer cancellation at %s returns to question page without grading',async(cancelAt)=>{
+ const h=harness();try{await seedNavigation(h);const choices:Array<string|undefined>=['继续刷题','提交答案',...(cancelAt==='input'?[]:[cancelAt==='confidence'?undefined:'确定']),'返回主菜单','退出学习'];let questionPages=0;
+ h.ctx.ui={notify(){},select:async(title:string,options:string[])=>{if(title.includes('当前题目'))questionPages++;const choice=choices.shift();if(choice!==undefined)expect(options).toContain(choice);return choice;},input:async()=>cancelAt==='input'?undefined:'A',confirm:async(title:string)=>title.includes('退出学习')} as any;
+ await h.commands.study.handler('',h.ctx);
+ expect(choices).toEqual([]);expect(questionPages).toBe(2);expect(h.state.active).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
+ }finally{h.close();}
+});
+it('confirmed answer is graded once and Esc navigates from question to main menu',async()=>{
+ const h=harness();try{await seedNavigation(h);const choices:Array<string|undefined>=['继续刷题','提交答案','确定',undefined,'退出学习'];let confirmations=0;
+ h.ctx.ui={notify(){},select:async(_title:string,options:string[])=>{if(confirmations===1&&options.includes('下一题')){expect(options[0]).toBe('下一题');expect(options).not.toContain('提交答案');}const choice=choices.shift();if(choice!==undefined)expect(options).toContain(choice);return choice;},input:async()=> 'A',confirm:async()=>{confirmations++;return true;}} as any;
+ await h.commands.study.handler('',h.ctx);expect(choices).toEqual([]);expect(confirmations).toBe(2);expect(h.state.active).toBe(false);
+ const rows=h.app.store.db.prepare('SELECT receipt FROM submissions').all();expect(rows).toHaveLength(1);expect(JSON.parse(String(rows[0]!.receipt)).grade.correct).toBe(true);
+ }finally{h.close();}
+});
+it.each(['题库与会话','解析与查证','预算'])('Esc from %s returns to main without ending the session or making changes',async(group)=>{
+ const h=harness();try{await seedNavigation(h);const choices:Array<string|undefined>=[group,undefined,'退出学习'];let page=0;
+ h.ctx.ui={notify(){},select:async(_title:string,options:string[])=>{if(page++===2)expect(h.state.active).toBe(true);const choice=choices.shift();if(choice)expect(options).toContain(choice);return choice;},confirm:async()=>true} as any;
+ await h.commands.study.handler('',h.ctx);expect(choices).toEqual([]);expect(h.state.active).toBe(false);expect(h.app.store.db.prepare('SELECT count(*) n FROM audit').get()?.n).toBe(0);
+ }finally{h.close();}
+});
+it('answer shortcut ignores command arguments and RPC cannot open a submission dialog',async()=>{
+ const h=harness();try{await seedNavigation(h);const choices=['返回主菜单','退出学习'];let inputs=0;
+ h.ctx.ui={notify(){},select:async()=>choices.shift(),input:async(_title:string,placeholder?:string)=>{inputs++;expect(placeholder).toBeUndefined();return undefined;},confirm:async()=>true} as any;
+ await h.commands['study-answer'].handler('A',{...h.ctx,mode:'rpc'});expect(inputs).toBe(0);
+ await h.commands['study-answer'].handler('A',h.ctx);expect(inputs).toBe(1);expect(choices).toEqual([]);expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions').get()?.n).toBe(0);
+ }finally{h.close();}
+});
+it('exit shortcut requires TUI confirmation and never enters learning when inactive',async()=>{
+ const h=harness();try{let confirms=0;let allow=false;h.ctx.ui={notify(){},select:async()=>undefined,confirm:async()=>{confirms++;return allow;}};
+ await h.commands['study-exit'].handler('yes',h.ctx);expect(confirms).toBe(0);expect(h.state.active).toBe(false);
+ await h.state.enter(h.ctx as any);await h.commands['study-exit'].handler('yes',{...h.ctx,mode:'rpc'});expect(confirms).toBe(0);expect(h.state.active).toBe(true);
+ await h.commands['study-exit'].handler('yes',h.ctx);expect(confirms).toBe(1);expect(h.state.active).toBe(true);
+ allow=true;await h.commands['study-exit'].handler('',h.ctx);expect(h.state.active).toBe(false);expect(h.getTools()).toEqual(['read','bash']);
+ }finally{h.close();}
+});
+it('failed model restoration still allows closing the menu while keeping inputs and tools protected',async()=>{
+ const h=harness();try{await h.state.enter(h.ctx as any);h.pi.setModel=async()=>false;const choices=['退出学习','收起菜单（仍在学习态）'];const messages:string[]=[];
+ h.ctx.ui={notify:(s:string)=>messages.push(s),select:async()=>choices.shift(),confirm:async()=>true} as any;await h.commands.study.handler('',h.ctx);
+ expect(choices).toEqual([]);expect(h.state.active).toBe(true);expect(h.getTools()).toEqual([]);expect(messages.join('\n')).toContain('原模型恢复失败');expect(messages.join('\n')).toContain('/quit');
+ expect(await h.handlers.input({text:'A',source:'interactive'},h.ctx)).toEqual({action:'handled'});
+ }finally{h.close();}
+});
+it('quit releases local resources without attempting model authentication again',async()=>{
+ const h=harness();const originalClose=h.app.close.bind(h.app);let closed=false,modelCalls=0;
+ try{await h.state.enter(h.ctx as any);h.pi.setModel=async()=>{modelCalls++;return false;};h.app.close=()=>{closed=true;};
+ await h.handlers.session_shutdown({reason:'quit'},h.ctx);expect(closed).toBe(true);expect(modelCalls).toBe(0);expect(h.state.active).toBe(false);
+ }finally{h.app.close=originalClose;h.close();}
+});
+it('an exhausted session offers navigation instead of another answer submission',async()=>{
+ const h=harness();try{await seedNavigation(h);const sid=h.app.getSetting('activeSession')!;await h.app.study.skip(sid,{origin:'cli',eventId:'finish-fixture'},(await h.app.study.inspect(sid)).question!.presentationId);await h.app.study.next(sid);
+ const choices=['继续刷题','返回主菜单','退出学习'];h.ctx.ui={notify(){},select:async(title:string,options:string[])=>{if(title.includes('暂无题目'))expect(options).not.toContain('提交答案');const choice=choices.shift();if(choice)expect(options).toContain(choice);return choice;},confirm:async()=>true} as any;
+ await h.commands.study.handler('',h.ctx);expect(choices).toEqual([]);expect(h.state.active).toBe(false);
+ }finally{h.close();}
+});
 it('paid explanation checks feedback before credentials and requires explicit menu confirmation',async()=>{
  const order:string[]=[];let locked=true;let confirm=true;
  const app={getSetting:()=> 'session',study:{inspect:async()=>({question:{presentationId:'original-pid'}}),feedback:async()=>{order.push('feedback');if(locked)throw Error('locked');return {};}}};
  const ctx={mode:'tui',hasUI:true,ui:{select:async()=> '受控 AI 讲解',notify(){},confirm:async()=>confirm},modelRegistry:{getApiKeyForProvider:async()=>{order.push('auth');return 'test-nonsecret';}}};
  const factory=async()=>({explain:async(pid:string)=>{expect(pid).toBe('original-pid');order.push('gateway');return {text:'bounded'};},verify:async()=>({})});
  const session={enter:async()=>{}};
- await expect(studyMenu(app as any,session as any,ctx as any,factory)).rejects.toThrow('locked');expect(order).toEqual(['feedback']);
- locked=false;confirm=false;order.length=0;await studyMenu(app as any,session as any,ctx as any,factory);expect(order).toEqual(['feedback']);
- confirm=true;order.length=0;await studyMenu(app as any,session as any,ctx as any,factory);expect(order).toEqual(['feedback','auth','gateway']);
+ await expect(runSelectedAction(app as any,session as any,ctx as any,factory)).rejects.toThrow('locked');expect(order).toEqual(['feedback']);
+ locked=false;confirm=false;order.length=0;await runSelectedAction(app as any,session as any,ctx as any,factory);expect(order).toEqual(['feedback']);
+ confirm=true;order.length=0;await runSelectedAction(app as any,session as any,ctx as any,factory);expect(order).toEqual(['feedback','auth','gateway']);
 });
 it('manual verification cancellation never resolves credentials',async()=>{
  let auth=false;const app={getSetting:()=> 's',study:{inspect:async()=>({question:{presentationId:'p'}}),feedback:async()=>({})}};
  const ctx={mode:'tui',hasUI:true,ui:{select:async()=> '手动资料查证',input:async()=>undefined},modelRegistry:{getApiKeyForProvider:async()=>{auth=true;return undefined;}}};
- await studyMenu(app as any,{enter:async()=>{}} as any,ctx as any,async()=>{throw Error('must not call');});expect(auth).toBe(false);
+ await runSelectedAction(app as any,{enter:async()=>{}} as any,ctx as any,async()=>{throw Error('must not call');});expect(auth).toBe(false);
 });
 it('manual verification passes explicit query and original presentation only',async()=>{
  const calls:unknown[]=[];const app={getSetting:()=> 's',study:{inspect:async()=>({question:{presentationId:'p-original'}}),feedback:async()=>({})}};
  const ctx={mode:'tui',hasUI:true,ui:{select:async()=> '手动资料查证',input:async()=> '  official units  ',confirm:async()=>true,notify(){}},modelRegistry:{getApiKeyForProvider:async()=> 'fake-test-key'}};
- await studyMenu(app as any,{enter:async()=>{}} as any,ctx as any,async()=>({explain:async()=>{throw Error('wrong operation');},verify:async(...args)=>{calls.push(args);return {status:'complete'};}}));expect(calls[0]).toMatchObject(['p-original','official units',expect.any(AbortSignal)]);
+ await runSelectedAction(app as any,{enter:async()=>{}} as any,ctx as any,async()=>({explain:async()=>{throw Error('wrong operation');},verify:async(...args)=>{calls.push(args);return {status:'complete'};}}));expect(calls[0]).toMatchObject(['p-original','official units',expect.any(AbortSignal)]);
 });
 it('missing credentials fail actionably before constructing paid service',async()=>{
  let built=false;const app={getSetting:()=> 's',study:{inspect:async()=>({question:{presentationId:'p'}}),feedback:async()=>({})}};
  const ctx={mode:'tui',hasUI:true,ui:{select:async()=> '受控 AI 讲解',confirm:async()=>true},modelRegistry:{getApiKeyForProvider:async()=>undefined}};
- await expect(studyMenu(app as any,{enter:async()=>{}} as any,ctx as any,async()=>{built=true;throw Error('must not construct');})).rejects.toThrow('本地学习仍可使用');expect(built).toBe(false);
+ await expect(runSelectedAction(app as any,{enter:async()=>{}} as any,ctx as any,async()=>{built=true;throw Error('must not construct');})).rejects.toThrow('本地学习仍可使用');expect(built).toBe(false);
 });
 import {parseAnswer} from '../../src/study/answer-input.js';
 import {safeQuestionImages,formatQuestion} from '../../src/adapters/pi/ui.js';
@@ -59,7 +119,7 @@ it('question images include all safe cross-page crops but reject traversal and s
 it('source quick selection forwards chosen source only',async()=>{
  const choices=['按来源开始 quick','2. second [source-b]'];let started:any;
  const app={getSetting:(k:string)=>k==='activeBank'?'bank':undefined,setSetting(){},banks:{listSources:async()=>[{id:'source-a',name:'first'},{id:'source-b',name:'second'}]},study:{start:async(x:unknown)=>{started=x;return {id:'new'};},next:async()=>null}};
- const ctx={mode:'tui',hasUI:true,ui:{select:async()=>choices.shift(),notify(){}}};await studyMenu(app as any,{enter:async()=>{}} as any,ctx as any);expect(started).toMatchObject({bankId:'bank',sourceId:'source-b',mode:'quick'});
+ const ctx={mode:'tui',hasUI:true,ui:{select:async()=>choices.shift(),notify(){}}};await runSelectedAction(app as any,{enter:async()=>{}} as any,ctx as any);expect(started).toMatchObject({bankId:'bank',sourceId:'source-b',mode:'quick'});
 });
 it('verification cancel menu aborts active request and completion closes cancel dialog',async()=>{
  const {withVerificationCancel}=await import('../../src/adapters/pi/ui.js');
@@ -80,6 +140,6 @@ it('throwing original model restore keeps safe tools and shutdown closes app des
 it('exit menu reports confirmed restoration and never success on failed restore',async()=>{
  const messages:string[]=[];let reject=false;const ctx={mode:'tui',hasUI:true,ui:{select:async()=> '退出学习',notify:(text:string)=>messages.push(text)}};
  const session={enter:async()=>{},exit:async()=>{if(reject)throw Error('原模型恢复失败');}};
- await studyMenu({getSetting:()=>undefined} as any,session as any,ctx as any);expect(messages).toEqual(['已退出学习，已恢复原模型；后续普通聊天不受本包预算保护']);
- messages.length=0;reject=true;await expect(studyMenu({getSetting:()=>undefined} as any,session as any,ctx as any)).rejects.toThrow('原模型恢复失败');expect(messages).toEqual([]);
+ await runSelectedAction({getSetting:()=>undefined} as any,session as any,ctx as any);expect(messages).toEqual(['已退出学习，已恢复原模型；后续普通聊天不受本包预算保护']);
+ messages.length=0;reject=true;await expect(runSelectedAction({getSetting:()=>undefined} as any,session as any,ctx as any)).rejects.toThrow('原模型恢复失败');expect(messages).toEqual([]);
 });
