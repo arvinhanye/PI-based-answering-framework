@@ -1,3 +1,4 @@
+import { formatMoney } from '../presentation/money.js';
 import { readFileSync } from 'node:fs';
 import { validateRates } from '../budget/ledger.js';
 import { questionCard, resultCard } from '../presentation/cards.js';
@@ -240,10 +241,12 @@ export function renderCli(result: any): string {
         return result;
     if (result?.question) {
         if (result.feedback)
-            return resultCard(result.question, result.answer, result.feedback, result.budget).replace('n 下一题', 'study next 下一题').replace('直接打字问 DeepSeek', '在 Pi 中提问').replace('/study undo', 'study undo');
-        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('n / Ctrl+Alt+N', 'study next').replaceAll('Ctrl+Alt+O 打开', '见题图文件').replaceAll('/study menu 设置', 'study help 帮助').replaceAll('/study exit 退出', '终端 Ctrl+C 退出').replaceAll('输入 =答案（多空用 | 分隔）', "study answer '第一空|第二空' 提交填空").replaceAll('输入答案', 'study answer A 提交答案').replaceAll('直接打字问 DeepSeek', '在 Pi 中提问') + (result.question.assets.length ? '\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
+            return resultCard(result.question, result.answer, result.feedback, result.budget);
+        return questionCard(result.question, result.progress ?? { correct: 0, total: 0 }, result.budget).replaceAll('Ctrl+Alt+O 打开', '见题图文件') + (result.question.assets.length ? '\n\n' + result.question.assets.map((a: any) => '题图：' + a.path).join('\n') : '');
     }
     if (result?.question === null)
         return '本轮已完成；study start 开新一轮。';
+    if (typeof result?.spentCny === 'string' && typeof result?.limitCny === 'string')
+        return `本月已用 ${formatMoney(result.spentCny)} / ${formatMoney(result.limitCny)} 元`;
     return JSON.stringify(result, null, 2);
 }

@@ -25,3 +25,11 @@ it.each(['A','n','解释一下','shortcut','image','undo'])('external movement r
  if(text==='shortcut'||text==='image')await h.pi.registerShortcut.mock.calls.find((x:any)=>x[0]===(text==='image'?'ctrl+alt+o':'ctrl+alt+n'))[1].handler(h.ctx);else if(text==='undo')await h.command('undo');else expect(await h.input(text)).toEqual({action:'handled'});
  const s=await h.app.study.inspect(id);expect(s.question?.presentationId).toBe(next.presentationId);expect(s.assisted).toBe(false);expect(s.status).toBe(text==='undo'?'submitted':'open');expect(h.app.store.db.prepare('SELECT count(*) n FROM submissions WHERE voided_at IS NULL').get()?.n).toBe(text==='undo'?1:0);expect(h.cards.some(c=>c.content.includes('第 2 题'))).toBe(true);expect(h.cards.at(-1).content).toContain('重新输入');
 });
+
+it('one below-editor widget holds scores, thinking and rounded cost without a second status',async()=>{
+ const h=await setup();await h.command();await h.input('A');
+ expect(h.ctx.ui.setWidget).toHaveBeenLastCalledWith('study-help',['n 下一题 · 直接打字问 DeepSeek · 本轮 对 1 · 错 0 · 本月 0.00 / 10.00 元'],{placement:'belowEditor'});
+ expect(h.ctx.ui.setStatus.mock.calls.every((c:any)=>c[1]===undefined)).toBe(true);
+ await h.input('n');await h.input('B');await h.command('think');expect(h.ctx.ui.setWidget.mock.calls.at(-1)[1][0]).toMatch(/^思考 · .*本轮 对 1 · 错 1/);
+ await h.command('undo');expect(h.ctx.ui.setWidget.mock.calls.at(-1)[1][0]).toContain('本轮 对 1 · 错 0');
+});
