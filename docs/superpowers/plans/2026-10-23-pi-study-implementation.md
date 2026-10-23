@@ -1,5 +1,7 @@
 # Pi Study Implementation Plan
 
+> **当前状态（2026-10-23）：** 本文部分条款已被[交互改造规格](../specs/2026-10-23-pi-study-ux-redesign.md)、[后续开发计划](../plans/2026-10-23-pi-study-roadmap.md)取代。作废内容包括预算硬控制（R17 / 原设计 §9 预留状态机）、一次性提交凭据与确认框（R05 / 原设计 §6）、原设计 §10.1 的 10 个模型工具。后续计划 §6 已将简答评分/规则版本/申诉重评、精学、资料升级迁移、通用导入/模板/云端 OCR 批次、证据缓存/异步查证、MCP 适配与自动出题移出完整首版范围；不再视为本版未完成项。原文保留作历史记录，当前范围以新规格和后续计划为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 获准开发后 72 小时内交付三份资料均已转换并实际导入的备考小版本，再完成可更换题库、三种学习模式、追溯判分和本地预算硬准入的完整首版。
