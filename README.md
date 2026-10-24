@@ -36,7 +36,8 @@ pi install --local ./pi-study
 | 单选、多选、判断、填空快刷；撤销；错题与复习；跨会话恢复 | 可用 |
 | DeepSeek 讲解与追问；题图发给 AI；每月费用记账（默认 10 元） | 可用 |
 | 三份题库：1500 题、省赛 109 题、WLAN PDF 979 题，共 2596 题 | 可用（通过数据包导入） |
-| 进度与成绩页、考点标签、按考点刷题、测验模式、联网查证 | 开发中，见 [后续计划](docs/superpowers/plans/2026-10-23-pi-study-roadmap.md) |
+| 进度与成绩页（`/study stats`） | 可用 |
+| 考点标签、按考点刷题、测验模式、联网查证 | 开发中，见 [后续计划](docs/superpowers/plans/2026-10-23-pi-study-roadmap.md) |
 | Windows、Linux | 未验证，可以尝试，但不保证可用 |
 
 ## 目录
